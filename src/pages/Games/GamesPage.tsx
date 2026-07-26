@@ -24,7 +24,7 @@ export function GamesPage() {
   if (activeGame === "minesweeper") return <MinesweeperGame onBack={() => setActiveGame(null)} />;
 
   return (
-    <div className="min-h-screen p-6">
+    <div className="min-h-screen bg-mf-surface p-6">
       <h1 className="text-2xl font-bold text-slate-200 text-center mb-6">🎮 Juegos</h1>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto">
         {GAMES.map(game => (
