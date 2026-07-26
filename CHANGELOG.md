@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/kodingvibes/late-micro-games/compare/v1.0.0...v1.1.0) (2026-07-26)
+
+
+### Features
+
+* **ui:** wrap page in .bg-mf-surface shared canvas ([9c84706](https://github.com/kodingvibes/late-micro-games/commit/9c84706017506608d06d72aad0d9da1c3eecef5d))
+
 # 1.0.0 (2026-07-26)
 
 
