@@ -8,7 +8,6 @@ import pkg from "../package.json" with { type: "json" };
 
 declare global {
   interface Window {
-    GamesEngine?: { version: string };
     __lateMicroGamesMount?: () => void;
   }
 }
