@@ -1,3 +1,10 @@
+## [2.2.1](https://github.com/kodingvibes/late-micro-games/compare/v2.2.0...v2.2.1) (2026-07-27)
+
+
+### Bug Fixes
+
+* **games:** make Godot mini-games responsive and fit the iframe ([03316ff](https://github.com/kodingvibes/late-micro-games/commit/03316ffa1fe631ea060a61e3c91e07efa1ab07ce))
+
 # [2.2.0](https://github.com/kodingvibes/late-micro-games/compare/v2.1.2...v2.2.0) (2026-07-27)
 
 
