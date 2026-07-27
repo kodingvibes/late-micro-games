@@ -36,15 +36,16 @@ export function useTic80(
 <head>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#111;overflow:hidden;display:flex;justify-content:center;align-items:center;min-height:100vh}
-canvas{width:100%;max-width:720px;height:auto;display:block;image-rendering:pixelated;outline:none;background:#000}
+body{background:#111}
+canvas{display:block;width:100%;aspect-ratio:240/136;max-width:720px;margin:0 auto;image-rendering:pixelated;outline:none;background:#000}
 canvas:focus{outline:none}
 </style>
 </head>
 <body>
-<canvas id="tic80-canvas" tabindex="0" oncontextmenu="event.preventDefault()" onmousedown="window.focus()"></canvas>
+<canvas id="tic80-canvas" width="240" height="136" tabindex="0" oncontextmenu="event.preventDefault()" onmousedown="window.focus()"></canvas>
 <script>
 window.Module = {
+  locateFile: function(f){return 'https://tic80.com/js/1.1.2837/'+f},
   canvas: document.getElementById('tic80-canvas'),
   arguments: [${JSON.stringify(cartUrl)}],
   print: function(m){console.log('[tic80]',m)},

@@ -19,7 +19,6 @@ export function Tic80Player({ cart, onBack }: Tic80PlayerProps) {
           ref={iframeRef}
           title={cart.name}
           className="w-full aspect-[240/136] rounded-lg bg-black border-0"
-          sandbox="allow-scripts allow-same-origin"
         />
         {state === "booting" && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg">
