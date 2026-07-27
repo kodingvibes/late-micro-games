@@ -1,3 +1,10 @@
+## [2.0.10](https://github.com/kodingvibes/late-micro-games/compare/v2.0.9...v2.0.10) (2026-07-27)
+
+
+### Bug Fixes
+
+* **tic80:** drop cart into MEMFS sandbox directly, skip preloader XHR ([0769133](https://github.com/kodingvibes/late-micro-games/commit/0769133672852788fab36e8210854fce02b360a0))
+
 ## [2.0.9](https://github.com/kodingvibes/late-micro-games/compare/v2.0.8...v2.0.9) (2026-07-27)
 
 
