@@ -7,3 +7,6 @@ dist
 # Auto-generated TIC-80 runtime (regenerated on every build by scripts/build-tic80-runtime.mjs)
 src/games/Tic80/_runtime.ts
 scripts/tic80-runtime/
+# Auto-generated standalone player assets (copied from scripts/tic80-runtime/ by build-tic80-runtime.mjs)
+public/tic80.js
+public/tic80.wasm
