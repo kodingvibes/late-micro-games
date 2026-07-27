@@ -1,3 +1,10 @@
+## [1.5.2](https://github.com/kodingvibes/late-micro-games/compare/v1.5.1...v1.5.2) (2026-07-27)
+
+
+### Bug Fixes
+
+* **tic80:** replace iframe with direct canvas embed ([a7d8531](https://github.com/kodingvibes/late-micro-games/commit/a7d8531143a49386be322c3c3c2f0f83e66c0af8))
+
 ## [1.5.1](https://github.com/kodingvibes/late-micro-games/compare/v1.5.0...v1.5.1) (2026-07-27)
 
 
