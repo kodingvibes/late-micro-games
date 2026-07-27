@@ -160,14 +160,8 @@ export function useTic80Iframe(cart: Tic80Game): UseTic80IframeResult {
       };
       window.addEventListener("message", onMessage);
 
-      // 5) Append to the host. The Tic80Player renders an element with
-      //    id="tic80-iframe-host" that we target directly.
-      const host =
-        document.getElementById("tic80-iframe-host") ?? document.body;
-      host.appendChild(iframe);
-
-      // 6) When the loader HTML has finished parsing, ship the init payload
-      //    with Transferable Objects so we don't copy large buffers.
+      // 5) Register the load listener BEFORE appending the iframe, so we
+      //    don't miss the event if loader.html loads instantly.
       const onIframeLoad = () => {
         if (cancelled || !mountedRef.current || !iframe.contentWindow) return;
         // Re-decode into fresh ArrayBuffers for transfer; the original
@@ -189,6 +183,12 @@ export function useTic80Iframe(cart: Tic80Game): UseTic80IframeResult {
         ]);
       };
       iframe.addEventListener("load", onIframeLoad);
+
+      // 6) Append to the host. The Tic80Player renders an element with
+      //    id="tic80-iframe-host" that we target directly.
+      const host =
+        document.getElementById("tic80-iframe-host") ?? document.body;
+      host.appendChild(iframe);
 
       // 7) Ready timeout. If the runtime never reports ready/error, give up.
       timeoutRef.current = setTimeout(() => {
