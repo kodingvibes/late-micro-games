@@ -104,10 +104,38 @@ export function useTic80(
     canvas.width = 240;
     canvas.height = 136;
 
+    // ponytail: wait for the canvas to have a real layout box before
+    // injecting the runtime. Inside a React modal the canvas mounts
+    // before the browser paints, so clientWidth is 0 on the first
+    // frame. The TIC-80 runtime reads `canvas.clientWidth` during
+    // SDL_CreateWindow; if it's 0 it bails out and never resizes or
+    // renders. One rAF tick is enough for layout to settle.
+    const waitForLayout = new Promise<void>((resolve) => {
+      if (canvas.clientWidth > 0 && canvas.clientHeight > 0) {
+        resolve();
+        return;
+      }
+      const obs = new ResizeObserver(() => {
+        if (canvas.clientWidth > 0 && canvas.clientHeight > 0) {
+          obs.disconnect();
+          resolve();
+        }
+      });
+      obs.observe(canvas);
+      requestAnimationFrame(() => {
+        if (canvas.clientWidth > 0 && canvas.clientHeight > 0) {
+          obs.disconnect();
+          resolve();
+        }
+      });
+    });
+
     let cleanup: (() => void) | null = null;
 
     (async () => {
       try {
+        await waitForLayout;
+        if (!mountedRef.current) return;
         const [runtime, cartRes] = await Promise.all([
           import("./_runtime"),
           fetch(cart.cartUrl, { mode: "cors", credentials: "omit" }),
