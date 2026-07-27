@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/kodingvibes/late-micro-games/compare/v1.3.0...v1.4.0) (2026-07-27)
+
+
+### Features
+
+* **games:** GameCard uses transparent glass surface ([eea9a1b](https://github.com/kodingvibes/late-micro-games/commit/eea9a1bf40750eda14a24aeebfd78b70cc7687ea))
+
 # [1.3.0](https://github.com/kodingvibes/late-micro-games/compare/v1.2.2...v1.3.0) (2026-07-27)
 
 
