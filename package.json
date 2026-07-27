@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "lint": "tsc --noEmit"
+    "build": "tsc --noEmit && vite build && node scripts/download-tic80.mjs",
+    "lint": "tsc --noEmit",
+    "download-tic80": "node scripts/download-tic80.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

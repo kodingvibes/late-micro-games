@@ -32,7 +32,9 @@ scripts manually from this repo.**
 - `GET /api/tic80/games` returns `Tic80Game[]` with `id`, `name`, `description`,
   `cartUrl` (CORS-enabled `.tic` binary), `coverUrl` (optional PNG), `accent`.
 - Falls back to a hardcoded catalog if the endpoint is unreachable.
-- TIC-80 cartridges run in an iframe with `allow-scripts allow-same-origin`
-  sandbox, loading the official WASM runtime from `tic80.com/js/1.1.2837/`.
+- TIC-80 cartridges render on a direct `<canvas>` in the main document (no iframe).
+- The official WASM runtime (`tic80.js` + `tic80.wasm`, v1.1.2837) is self-hosted
+  at `/tic80/` on the same origin, downloaded from `tic80.com` during `npm run build`.
+- Cart switching tears down and re-injects the runtime via cache-busted `<script>`.
 - Cover images are extracted from the `.tic` binary (CHUNK_SCREEN + PALETTE)
   when `coverUrl` is not provided. Cached per `cartUrl`.

@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from "react";
 
 export type PlayerState = "idle" | "booting" | "ready" | "error";
 
-const TIC80_JS = "https://tic80.com/js/1.1.2837/tic80.js";
+const TIC80_BASE = "/tic80";
+const TIC80_JS = TIC80_BASE + "/tic80.js";
 
 function injectScript(cartUrl: string, canvas: HTMLCanvasElement): () => void {
   const prev = (window as any).Module;
   (window as any).Module = {
-    locateFile: (f: string) => "https://tic80.com/js/1.1.2837/" + f,
+    locateFile: (f: string) => TIC80_BASE + "/" + f,
     canvas,
     arguments: [cartUrl],
     print: (m: string) => console.log("[tic80]", m),
