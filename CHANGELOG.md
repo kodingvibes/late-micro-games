@@ -1,3 +1,10 @@
+## [2.0.4](https://github.com/kodingvibes/late-micro-games/compare/v2.0.3...v2.0.4) (2026-07-27)
+
+
+### Bug Fixes
+
+* **tic80:** loader.html — 3 bugs blocking cart load in sandboxed iframe ([767e1a9](https://github.com/kodingvibes/late-micro-games/commit/767e1a9d6c40f41871ba3b0ad455cfe6e0f93aa3))
+
 ## [2.0.3](https://github.com/kodingvibes/late-micro-games/compare/v2.0.2...v2.0.3) (2026-07-27)
 
 
