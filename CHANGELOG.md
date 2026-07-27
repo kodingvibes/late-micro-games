@@ -1,3 +1,10 @@
+## [2.0.11](https://github.com/kodingvibes/late-micro-games/compare/v2.0.10...v2.0.11) (2026-07-27)
+
+
+### Bug Fixes
+
+* **tic80:** write cart in preRun instead of onRuntimeInitialized ([61c997d](https://github.com/kodingvibes/late-micro-games/commit/61c997d76c08531891b5c6a50b686e130a54aeb1))
+
 ## [2.0.10](https://github.com/kodingvibes/late-micro-games/compare/v2.0.9...v2.0.10) (2026-07-27)
 
 
