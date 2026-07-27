@@ -174,10 +174,11 @@ class TetrisScene extends Phaser.Scene {
     const g = this.graphics;
     g.clear();
     const w = this.scale.width;
+    const h = this.scale.height;
     const boardW = COLS * CELL;
     const boardH = ROWS * CELL;
     const ox = Math.floor((w - boardW) / 2);
-    const oy = 60;
+    const oy = Math.max(60, Math.floor((h - boardH) / 2));
 
     g.fillStyle(0x000000, 1);
     g.fillRect(ox, oy, boardW, boardH);
@@ -217,6 +218,6 @@ export const createTetrisGame: PhaserGameFactory = (parent) => {
     height: 700,
     backgroundColor: "#1a1a22",
     scene: [TetrisScene],
-    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+    scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
   });
 };

@@ -161,6 +161,6 @@ export const createSnakeGame: PhaserGameFactory = (parent) => {
     height: 700,
     backgroundColor: "#141420",
     scene: [SnakeScene],
-    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+    scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
   });
 };

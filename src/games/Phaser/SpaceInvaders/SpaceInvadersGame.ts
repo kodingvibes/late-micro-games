@@ -174,6 +174,6 @@ export const createSpaceInvadersGame: PhaserGameFactory = (parent) => {
     height: 700,
     backgroundColor: "#050510",
     scene: [SpaceInvadersScene],
-    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+    scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
   });
 };

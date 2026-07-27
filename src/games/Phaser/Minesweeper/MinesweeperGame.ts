@@ -180,6 +180,6 @@ export const createMinesweeperGame: PhaserGameFactory = (parent) => {
     height: 600,
     backgroundColor: "#2c3e50",
     scene: [MinesweeperScene],
-    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+    scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
   });
 };

@@ -213,6 +213,6 @@ export const createTwenty48Game: PhaserGameFactory = (parent) => {
     height: 600,
     backgroundColor: "#faf8ef",
     scene: [Twenty48Scene],
-    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+    scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
   });
 };
