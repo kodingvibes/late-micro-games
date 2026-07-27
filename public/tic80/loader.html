@@ -67,24 +67,72 @@
       canvas: canvas,
       arguments: [cartName],
       wasmBinary: wasmBytes,
-      preRun: [
-        function () {
-          try {
-            if (typeof FS === "undefined") {
-              postError("FS not available at preRun");
-              return;
-            }
-            // If a previous cart with the same name lingered, drop it first.
-            try { FS.unlink("/" + cartName); } catch (e) { /* not there yet */ }
-            FS.createDataFile("/", cartName, cartBytes, true, true);
-          } catch (e) {
-            postError("FS.createDataFile failed: " + (e && e.message ? e.message : e));
-          }
-        },
-      ],
+      // NOTE: preRun runs BEFORE initRuntime(), so FS is NOT available here.
+      // We put the cart into MEMFS inside onRuntimeInitialized instead.
+      preRun: [],
       print: function (m) { postLog("log", m); },
       printErr: function (m) { postLog("error", m); },
       onRuntimeInitialized: function () {
+        // 1) Put the cart into MEMFS now that FS is available.
+        try {
+          // If a previous cart with the same name lingered, drop it first.
+          try { FS.unlink("/" + cartName); } catch (e) { /* not there yet */ }
+          FS.createDataFile("/", cartName, cartBytes, true, true);
+        } catch (e) {
+          postError("FS.createDataFile failed: " + (e && e.message ? e.message : e));
+          return;
+        }
+
+        // 2) The runtime script (tic80.js) loads asynchronously via a <script>
+        //    tag.  When it executes, it overwrites `window.readAsync` with its
+        //    own XHR-based version, which *also* overwrites the loader's earlier
+        //    override (lines 131-145 below).  Since the iframe is sandboxed with
+        //    `allow-scripts` only (no `allow-same-origin`), XHR to any URL will
+        //    fail.  We re-apply our MEMFS-based override here, *after* the
+        //    runtime has finished loading but *before* `callMain` runs (which
+        //    triggers `FS.createPreloadedFile` → `asyncLoad` → `readAsync`).
+        //    Capture the runtime's XHR readAsync as the fallback for non-cart
+        //    resources (e.g. data files bundled with the cart).
+        var runtimeReadAsync = window.readAsync;
+        window.readAsync = function (url, onload, onerror) {
+          try {
+            // The runtime passes the full cart URL (e.g.
+            // "https://tic80.com/cart/.../palette_demo.tic") to readAsync.
+            // We check if the URL ends with the cart name.
+            if (typeof url === "string" && cartName && typeof FS !== "undefined") {
+              var idx = url.lastIndexOf("/");
+              var basename = idx >= 0 ? url.substring(idx + 1) : url;
+              // Strip query/hash if present
+              var qIdx = basename.indexOf("?");
+              if (qIdx >= 0) basename = basename.substring(0, qIdx);
+              var hIdx = basename.indexOf("#");
+              if (hIdx >= 0) basename = basename.substring(0, hIdx);
+              if (basename === cartName) {
+                var data = FS.readFile("/" + cartName, { encoding: "binary" });
+                if (data && data.buffer) {
+                  // IMPORTANT: Use setTimeout to make the callback async.
+                  // Emscripten's asyncLoad adds a run dependency AFTER
+                  // readAsync returns.  If we call onload synchronously,
+                  // the dependency is removed before it's added, causing
+                  // the runtime to hang forever waiting for it.
+                  setTimeout(function () {
+                    onload(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+                  }, 0);
+                  return;
+                }
+              }
+            }
+          } catch (e) {
+            if (onerror) onerror(e);
+            return;
+          }
+          // Fallback: runtime's XHR readAsync for non-cart resources.
+          if (typeof runtimeReadAsync === "function") {
+            runtimeReadAsync(url, onload, onerror);
+          } else if (onerror) {
+            onerror();
+          }
+        };
         postReady();
       },
       setStatus: function (m) {
@@ -94,35 +142,11 @@
       },
     };
 
-    // Override readAsync so the runtime pulls the cart from MEMFS instead of doing
-    // an XHR to tic80.com. readAsync(url, onload, onerror) — url can be a string or
-    // a Uint8Array (for paths already in MEMFS). We only intercept string URLs that
-    // match the requested cart name; everything else falls back to the original.
-    var originalReadAsync = window.readAsync;
-    window.readAsync = function (url, onload, onerror) {
-      try {
-        var name = null;
-        if (typeof url === "string") {
-          // Strip a leading slash — the runtime sometimes passes "/cart.tic".
-          name = url.charAt(0) === "/" ? url.substring(1) : url;
-        }
-        if (name && name === cartName && typeof FS !== "undefined") {
-          var data = FS.readFile("/" + name, { encoding: "binary" });
-          if (data && data.buffer) {
-            onload(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
-            return;
-          }
-        }
-      } catch (e) {
-        if (onerror) onerror(e);
-        return;
-      }
-      if (typeof originalReadAsync === "function") {
-        originalReadAsync(url, onload, onerror);
-      } else if (onerror) {
-        onerror();
-      }
-    };
+    // NOTE: The readAsync override below runs *before* the runtime script loads.
+    // The runtime overwrites `window.readAsync` when it executes, so this override
+    // is effectively dead code after that point.  The real override that survives
+    // is applied inside `onRuntimeInitialized` above, which runs after the runtime
+    // has loaded but before `callMain` triggers `FS.createPreloadedFile`.
 
     var script = document.createElement("script");
     script.src = scriptUrl;
