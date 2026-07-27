@@ -1,3 +1,10 @@
+## [2.1.2](https://github.com/kodingvibes/late-micro-games/compare/v2.1.1...v2.1.2) (2026-07-27)
+
+
+### Bug Fixes
+
+* **godot:** ensure iframe has explicit min-height and absolute fill ([6de2609](https://github.com/kodingvibes/late-micro-games/commit/6de26091afd2f4e8b5d5144472fc75ebb4af0a62))
+
 ## [2.1.1](https://github.com/kodingvibes/late-micro-games/compare/v2.1.0...v2.1.1) (2026-07-27)
 
 
