@@ -29,7 +29,14 @@ function injectRuntime(
   // its canvas context — the runtime boots, the cart loads, but the
   // framebuffer never gets drawn to.
 
-  const prevModule = (window as any).Module;
+  // The runtime is loaded as an async <script>. The script reads
+  // `window.Module` synchronously when it parses, so we must set
+  // Module *before* appending the script tag. We don't restore the
+  // previous Module on cleanup: doing so races with another mount
+  // of this hook (React strict mode, modal open/close) and the
+  // runtime from the prior inject ends up running against a stale
+  // Module — the "Cannot read properties of undefined (reading
+  // 'saveAs')" crash that leaves the canvas black.
   (window as any).Module = {
     canvas,
     arguments: [cartName],
@@ -77,7 +84,7 @@ function injectRuntime(
   return () => {
     script.remove();
     URL.revokeObjectURL(url);
-    (window as any).Module = prevModule;
+    // Don't touch window.Module — see the note in injectRuntime.
   };
 }
 
