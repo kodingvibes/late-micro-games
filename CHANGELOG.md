@@ -1,3 +1,10 @@
+# [2.1.0](https://github.com/kodingvibes/late-micro-games/compare/v2.0.12...v2.1.0) (2026-07-27)
+
+
+### Features
+
+* **godot:** replace TIC-80/mad8 with official Godot Dodge the Creeps demo ([0917b7b](https://github.com/kodingvibes/late-micro-games/commit/0917b7b21afc5f891fc2b834d8f2e2f543e10fb6))
+
 ## [2.0.12](https://github.com/kodingvibes/late-micro-games/compare/v2.0.11...v2.0.12) (2026-07-27)
 
 
