@@ -9,26 +9,30 @@ interface Tic80PlayerProps {
 }
 
 export function Tic80Player({ cart, onBack }: Tic80PlayerProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { state, error } = useTic80(cart.cartUrl, containerRef);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { state, error } = useTic80(cart.cartUrl, canvasRef);
 
   return (
     <GameLayout title={cart.name} accent={cart.accent} onBack={onBack} score={null}>
       <div className="relative w-full max-w-2xl">
-        {/* The iframe sandbox lives inside this container. Its 240x136 canvas is scaled up by CSS. */}
-        <div
-          ref={containerRef}
-          className="w-full aspect-[240/136] rounded-lg bg-black overflow-hidden flex items-center justify-center"
+        <canvas
+          ref={canvasRef}
+          width={240}
+          height={136}
+          className="w-full aspect-[240/136] rounded-lg bg-black image-rendering-pixelated"
+          onContextMenu={(e) => e.preventDefault()}
+          onMouseDown={() => canvasRef.current?.focus()}
+          tabIndex={0}
         />
         {state === "booting" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg pointer-events-none">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg">
             <span className="text-slate-400 text-sm animate-pulse">
               Cargando juego...
             </span>
           </div>
         )}
         {state === "error" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/80 rounded-lg p-4 text-center">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg">
             <span className="text-red-400 text-sm">
               {error || "Error al cargar el juego"}
             </span>
