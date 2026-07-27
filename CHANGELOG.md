@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/kodingvibes/late-micro-games/compare/v1.4.0...v1.5.0) (2026-07-27)
+
+
+### Features
+
+* **tic80:** embed TIC-80 cartridge player with cover extraction ([b77b049](https://github.com/kodingvibes/late-micro-games/commit/b77b04945b0a04c24aea99b2be1cb58bf14b4aa8))
+
 # [1.4.0](https://github.com/kodingvibes/late-micro-games/compare/v1.3.0...v1.4.0) (2026-07-27)
 
 
