@@ -1,3 +1,10 @@
+## [2.0.5](https://github.com/kodingvibes/late-micro-games/compare/v2.0.4...v2.0.5) (2026-07-27)
+
+
+### Bug Fixes
+
+* **tic80:** register iframe load listener before appendChild to avoid race condition ([ec3c8d4](https://github.com/kodingvibes/late-micro-games/commit/ec3c8d435fb995d34cdb5bb5b05285a03549a2ae))
+
 ## [2.0.4](https://github.com/kodingvibes/late-micro-games/compare/v2.0.3...v2.0.4) (2026-07-27)
 
 
