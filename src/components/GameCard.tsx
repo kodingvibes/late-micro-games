@@ -13,7 +13,7 @@ export function GameCard({ name, icon, description, bestScore, onClick, accent }
   return (
     <button
       onClick={onClick}
-      className={`group relative flex flex-col items-center gap-2 rounded-2xl border-${accent}-500/20 bg-${accent}-500/5 p-6 shadow-card transition-all hover:border-${accent}-500/40 hover:bg-${accent}-500/10 hover:scale-[1.02] active:scale-[0.98]`}
+      className={`group relative flex flex-col items-center gap-2 p-6 rounded-2xl border-${accent}-500/20 bg-transparent shadow-card transition-all hover:border-${accent}-500/40 hover:bg-accent/5 hover:scale-[1.02] active:scale-[0.98] backdrop-blur-sm`}
     >
       <div className={`text-4xl text-${accent}-400`}>{icon}</div>
       <span className="text-sm font-semibold text-slate-200">{name}</span>
