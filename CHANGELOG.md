@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/kodingvibes/late-micro-games/compare/v1.2.0...v1.2.1) (2026-07-27)
+
+
+### Bug Fixes
+
+* **games:** doodle wallpaper now uses one SVG sprite tile ([d2852c0](https://github.com/kodingvibes/late-micro-games/commit/d2852c06e64b00ddf446e8aee3772637442d835c))
+
 # [1.2.0](https://github.com/kodingvibes/late-micro-games/compare/v1.1.0...v1.2.0) (2026-07-27)
 
 
