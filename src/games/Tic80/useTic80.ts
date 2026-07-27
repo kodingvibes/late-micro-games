@@ -20,8 +20,6 @@ function injectRuntime(
   const blob = new Blob([jsCode], { type: "text/javascript" });
   const url = URL.createObjectURL(blob);
 
-  const cartName = cartUrl.split("/").pop() || "cart.tic";
-
   // ponytail: do NOT eagerly create a WebGL context here. The TIC-80
   // runtime's Emscripten SDL2 module creates its own via
   // `canvas.getContext("webgl", ...)`. If we create a WebGL2 context
@@ -29,45 +27,38 @@ function injectRuntime(
   // its canvas context — the runtime boots, the cart loads, but the
   // framebuffer never gets drawn to.
 
-  // The runtime is loaded as an async <script>. The script reads
-  // `window.Module` synchronously when it parses, so we must set
-  // Module *before* appending the script tag. We don't restore the
-  // previous Module on cleanup: doing so races with another mount
-  // of this hook (React strict mode, modal open/close) and the
-  // runtime from the prior inject ends up running against a stale
-  // Module — the "Cannot read properties of undefined (reading
-  // 'saveAs')" crash that leaves the canvas black.
+  // ponytail: write the cart directly into the MEMFS sandbox folder
+  // (FS.cwd()) before injecting the runtime. The TIC-80 web build's
+  // `emsStart` only sets up the preloaded-file flow when `argv[1]`
+  // ends in `.tic`; if we don't pass it as a CLI arg, the C side
+  // boots into the studio and looks for the cart at the configured
+  // `console->rom.path`. We can write the cart there directly, but
+  // the path is locked to the sandbox. Easiest: pass the cart name
+  // as the first arg so `emsStart` sets up the preloader, AND drop
+  // the cart bytes into MEMFS at the path the preloader would have
+  // created, AND seed `Module.filePreloaded = true` so the bootstrap
+  // tick fires `start()` on its very first poll.
+  const cartName = cartUrl.split("/").pop() || "cart.tic";
   (window as any).Module = {
     canvas,
     arguments: [cartName],
     wasmBinary: wasmBytes,
+    filePreloaded: true,
     print: (m: string) => console.log("[tic80]", m),
     printErr: (m: string) => console.error("[tic80]", m),
     onRuntimeInitialized: () => {
-      var w = window as any;
-      // Override createPreloadedFile to replace the cart URL with a blob
-      // URL that serves the cart bytes. The original function's async
-      // machinery (addRunDependency / removeRunDependency) works correctly
-      // when the XHR succeeds, and the blob URL is same-origin.
-      var orig = w.FS.createPreloadedFile;
-      w.FS.createPreloadedFile = function (parent: any, name: any, url: any, canRead: any, canWrite: any, onload: any, onerror: any, dontCreateFile: any, canOwn: any, preFinish: any) {
-        var basename = "";
-        if (typeof url === "string") {
-          var idx = url.lastIndexOf("/");
-          basename = idx >= 0 ? url.substring(idx + 1) : url;
-        }
-        var isCart = basename === cartName ||
-          (typeof url === "string" && url.length >= cartName.length &&
-           url.lastIndexOf(cartName) === url.length - cartName.length);
-        if (isCart) {
-          // Emscripten's createPreloadedFile uses asyncLoad for strings.
-          // Pass the cart bytes directly as a Uint8Array so it goes through
-          // the synchronous processData path with proper dependency handling.
-          console.log("[tic80-debug] serving cart bytes directly: " + name);
-          return orig.call(this, parent, name, cartBytes, canRead, canWrite, onload, onerror, dontCreateFile, canOwn, preFinish);
-        }
-        return orig.apply(this, arguments);
-      };
+      // ponytail: the preloader would have written the cart at
+      // `<sandbox>/<cartName>`. We just drop the bytes there
+      // synchronously and seed `filePreloaded = true` so the
+      // bootstrap tick fires `start()` immediately instead of
+      // waiting for an XHR that will never come.
+      try {
+        const sandbox = "/com.nesbox.tic/TIC-80";
+        (window as any).FS.mkdirTree(sandbox);
+        (window as any).FS.writeFile(sandbox + "/" + cartName, cartBytes);
+      } catch (e) {
+        console.error("[tic80] cart preload failed:", e);
+      }
       document.dispatchEvent(new CustomEvent("tic80:ready"));
     },
     setStatus: (m: string) => {
@@ -84,7 +75,7 @@ function injectRuntime(
   return () => {
     script.remove();
     URL.revokeObjectURL(url);
-    // Don't touch window.Module — see the note in injectRuntime.
+    // Don't touch window.Module — see the note above.
   };
 }
 
