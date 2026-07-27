@@ -27,3 +27,12 @@ scripts manually from this repo.**
 ## Backend coupling
 - Consumes game data from `late-games-service` via the shell's `window.LateSession`.
 - `window.GamesEngine` is the single source of truth for games state.
+
+## TIC-80 catalog
+- `GET /api/tic80/games` returns `Tic80Game[]` with `id`, `name`, `description`,
+  `cartUrl` (CORS-enabled `.tic` binary), `coverUrl` (optional PNG), `accent`.
+- Falls back to a hardcoded catalog if the endpoint is unreachable.
+- TIC-80 cartridges run in an iframe with `allow-scripts allow-same-origin`
+  sandbox, loading the official WASM runtime from `tic80.com/js/1.1.2837/`.
+- Cover images are extracted from the `.tic` binary (CHUNK_SCREEN + PALETTE)
+  when `coverUrl` is not provided. Cached per `cartUrl`.

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 interface GameLayoutProps {
   title: string;
-  score: number;
+  score: number | null;
   onBack: () => void;
   children: ReactNode;
   accent?: string;
@@ -19,7 +19,7 @@ export function GameLayout({ title, score, onBack, children, accent = "indigo" }
           ← lobby
         </button>
         <h2 className={`text-lg font-bold text-${accent}-300`}>{title}</h2>
-        <span className={`text-sm font-mono text-${accent}-400`}>{score}</span>
+        <span className={`text-sm font-mono text-${accent}-400`}>{score ?? ""}</span>
       </div>
       {children}
     </div>
