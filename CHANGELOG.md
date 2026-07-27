@@ -1,3 +1,10 @@
+## [2.3.1](https://github.com/kodingvibes/late-micro-games/compare/v2.3.0...v2.3.1) (2026-07-27)
+
+
+### Bug Fixes
+
+* **games:** make Phaser canvas resize with its container ([92245aa](https://github.com/kodingvibes/late-micro-games/commit/92245aa95a6de503e81a3302fea21d3e2f74fd29))
+
 # [2.3.0](https://github.com/kodingvibes/late-micro-games/compare/v2.2.1...v2.3.0) (2026-07-27)
 
 
