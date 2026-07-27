@@ -22,15 +22,12 @@ function injectRuntime(
 
   const cartName = cartUrl.split("/").pop() || "cart.tic";
 
-  // Eagerly create a 2D/WebGL context so the runtime doesn't try on a
-  // canvas that the browser considers hidden or zero-sized. TIC-80's
-  // Emscripten Browser module picks this up via Module.canvas.
-  const gl =
-    canvas.getContext("webgl2") ||
-    canvas.getContext("webgl") ||
-    canvas.getContext("experimental-webgl");
-  const ctx2d = gl ? null : canvas.getContext("2d");
-  console.log("[tic80-debug] canvas context: webgl=" + !!gl + " 2d=" + !!ctx2d + " canvas=" + canvas.width + "x" + canvas.height + " client=" + canvas.clientWidth + "x" + canvas.clientHeight);
+  // ponytail: do NOT eagerly create a WebGL context here. The TIC-80
+  // runtime's Emscripten SDL2 module creates its own via
+  // `canvas.getContext("webgl", ...)`. If we create a WebGL2 context
+  // first, the subsequent WebGL1 request returns null and SDL2 loses
+  // its canvas context — the runtime boots, the cart loads, but the
+  // framebuffer never gets drawn to.
 
   const prevModule = (window as any).Module;
   (window as any).Module = {
