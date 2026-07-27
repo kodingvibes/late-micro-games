@@ -1,3 +1,10 @@
+## [1.5.1](https://github.com/kodingvibes/late-micro-games/compare/v1.5.0...v1.5.1) (2026-07-27)
+
+
+### Bug Fixes
+
+* **tic80:** explicit canvas dimensions, remove iframe sandbox, add locateFile ([212dadb](https://github.com/kodingvibes/late-micro-games/commit/212dadb928f9fbfcd65bf0bf084bdcb4f72d8044))
+
 # [1.5.0](https://github.com/kodingvibes/late-micro-games/compare/v1.4.0...v1.5.0) (2026-07-27)
 
 
