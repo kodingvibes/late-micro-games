@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/kodingvibes/late-micro-games/compare/v1.1.0...v1.2.0) (2026-07-27)
+
+
+### Features
+
+* **games:** add theme-aware doodle wallpaper with games motifs ([7a93c54](https://github.com/kodingvibes/late-micro-games/commit/7a93c5460cc6cce7b1081391f1b0ff96a9485609)), closes [hi#contrast](https://github.com/hi/issues/contrast)
+
 # [1.1.0](https://github.com/kodingvibes/late-micro-games/compare/v1.0.0...v1.1.0) (2026-07-26)
 
 
