@@ -1,3 +1,10 @@
+## [2.0.8](https://github.com/kodingvibes/late-micro-games/compare/v2.0.7...v2.0.8) (2026-07-27)
+
+
+### Bug Fixes
+
+* **tic80:** defer runtime injection until canvas has layout ([f586ce9](https://github.com/kodingvibes/late-micro-games/commit/f586ce9ca1db79f665a4ed2bc3c55612c9705771))
+
 ## [2.0.7](https://github.com/kodingvibes/late-micro-games/compare/v2.0.6...v2.0.7) (2026-07-27)
 
 
