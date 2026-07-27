@@ -28,7 +28,7 @@ export function GodotDemo({ onBack }: GodotDemoProps) {
       <div className="flex-1 min-h-0 relative">
         <iframe
           ref={iframeRef}
-          src="/godot-demo/godot-demo.html"
+          src="/micro/games/latest/godot-demo/godot-demo.html"
           className="w-full h-full border-0"
           allow="fullscreen; autoplay"
           title="Godot demo"
