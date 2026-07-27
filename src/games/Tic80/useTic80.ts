@@ -2,41 +2,45 @@ import { useEffect, useRef, useState } from "react";
 
 export type PlayerState = "idle" | "booting" | "ready" | "error";
 
-const TIC80_BASE = "/tic80";
-const TIC80_JS = TIC80_BASE + "/tic80.js";
+const decode = (b64: string): Uint8Array<ArrayBuffer> => {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(new ArrayBuffer(bin.length));
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+};
 
-function injectScript(cartUrl: string, canvas: HTMLCanvasElement): () => void {
-  const prev = (window as any).Module;
+function injectRuntime(
+  cartUrl: string,
+  canvas: HTMLCanvasElement,
+  jsCode: Uint8Array<ArrayBuffer>,
+  wasmBytes: Uint8Array<ArrayBuffer>,
+): () => void {
+  const blob = new Blob([jsCode], { type: "text/javascript" });
+  const url = URL.createObjectURL(blob);
+
   (window as any).Module = {
-    locateFile: (f: string) => TIC80_BASE + "/" + f,
     canvas,
     arguments: [cartUrl],
+    wasmBinary: wasmBytes,
     print: (m: string) => console.log("[tic80]", m),
     printErr: (m: string) => console.error("[tic80]", m),
     onRuntimeInitialized: () => {
       document.dispatchEvent(new CustomEvent("tic80:ready"));
     },
     setStatus: (m: string) => {
-      if (m && m.includes("error"))
+      if (typeof m === "string" && m.includes("error"))
         document.dispatchEvent(new CustomEvent("tic80:error", { detail: m }));
     },
   };
 
-  const existing = document.getElementById("tic80-script");
-  if (existing) existing.remove();
-
   const script = document.createElement("script");
-  script.id = "tic80-script";
-  script.src = TIC80_JS + "?_=" + Date.now();
+  script.src = url;
   document.body.appendChild(script);
 
   return () => {
-    const s = document.getElementById("tic80-script");
-    if (s) s.remove();
-    if ((window as any).Module === (window as any).__tic80_module) {
-      delete (window as any).__tic80_module;
-      delete (window as any).Module;
-    }
+    script.remove();
+    URL.revokeObjectURL(url);
+    (window as any).Module = undefined;
   };
 }
 
@@ -60,7 +64,22 @@ export function useTic80(
       return () => {};
     }
 
-    const cleanup = injectScript(cartUrl, canvas);
+    let cleanup: () => void = () => {};
+
+    (async () => {
+      try {
+        const runtime = await import("./_runtime");
+        const jsCode = decode(runtime.TIC80_JS_B64);
+        const wasmBytes = decode(runtime.TIC80_WASM_B64);
+        if (!mountedRef.current) return;
+        cleanup = injectRuntime(cartUrl, canvas, jsCode, wasmBytes);
+      } catch (e) {
+        if (mountedRef.current) {
+          setError(e instanceof Error ? e.message : String(e));
+          setState("error");
+        }
+      }
+    })();
 
     const onReady = () => {
       if (mountedRef.current) setState("ready");
@@ -81,7 +100,7 @@ export function useTic80(
       document.removeEventListener("tic80:error", onError);
       cleanup();
     };
-  }, [cartUrl, canvasRef]);
+  }, [cartUrl]);
 
   return { state, error };
 }

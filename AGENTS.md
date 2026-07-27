@@ -33,8 +33,15 @@ scripts manually from this repo.**
   `cartUrl` (CORS-enabled `.tic` binary), `coverUrl` (optional PNG), `accent`.
 - Falls back to a hardcoded catalog if the endpoint is unreachable.
 - TIC-80 cartridges render on a direct `<canvas>` in the main document (no iframe).
-- The official WASM runtime (`tic80.js` + `tic80.wasm`, v1.1.2837) is self-hosted
-  at `/tic80/` on the same origin, downloaded from `tic80.com` during `npm run build`.
-- Cart switching tears down and re-injects the runtime via cache-busted `<script>`.
+- The official WASM runtime (`tic80.js` + `tic80.wasm`, v1.1.2837) is bundled
+  into the micro-frontend as a separate code-split chunk (~7.6 MB raw / 2.7 MB gzipped).
+  Downloaded from `tic80.com` once during `npm run download-tic80` into
+  `scripts/tic80-runtime/`, then encoded into `src/games/Tic80/_runtime.ts` by
+  `scripts/build-tic80-runtime.mjs`.
+- The runtime is loaded at runtime via a `Blob` URL with `text/javascript` MIME
+  type, so it works regardless of how the shell serves static assets. The WASM
+  is passed directly via `Module.wasmBinary` (no separate fetch).
+- Both `src/games/Tic80/_runtime.ts` and `scripts/tic80-runtime/` are gitignored.
+- Cart switching tears down and re-injects the runtime via dynamic import.
 - Cover images are extracted from the `.tic` binary (CHUNK_SCREEN + PALETTE)
   when `coverUrl` is not provided. Cached per `cartUrl`.

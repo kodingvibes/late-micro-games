@@ -3,3 +3,7 @@ dist
 .vite
 *.log
 .DS_Store
+
+# Auto-generated TIC-80 runtime (regenerated on every build by scripts/build-tic80-runtime.mjs)
+src/games/Tic80/_runtime.ts
+scripts/tic80-runtime/

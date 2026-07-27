@@ -3,7 +3,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const OUT = join(__dirname, "..", "dist", "tic80");
+const OUT = join(__dirname, "tic80-runtime");
 
 const FILES = [
   ["tic80.js", "https://tic80.com/js/1.1.2837/tic80.js"],
@@ -13,7 +13,7 @@ const FILES = [
 async function download(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-  return res.ok ? Buffer.from(await res.arrayBuffer()) : null;
+  return Buffer.from(await res.arrayBuffer());
 }
 
 async function main() {
