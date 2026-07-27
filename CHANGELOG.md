@@ -1,3 +1,10 @@
+## [1.2.2](https://github.com/kodingvibes/late-micro-games/compare/v1.2.1...v1.2.2) (2026-07-27)
+
+
+### Bug Fixes
+
+* **games:** redraw doodle motifs as hand-drawn strokes ([0d80886](https://github.com/kodingvibes/late-micro-games/commit/0d80886d7307aac8e302362771921d761f5b57a0))
+
 ## [1.2.1](https://github.com/kodingvibes/late-micro-games/compare/v1.2.0...v1.2.1) (2026-07-27)
 
 
