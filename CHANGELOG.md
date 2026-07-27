@@ -1,3 +1,10 @@
+## [2.0.7](https://github.com/kodingvibes/late-micro-games/compare/v2.0.6...v2.0.7) (2026-07-27)
+
+
+### Bug Fixes
+
+* **tic80:** stop eagerly creating WebGL2 context that breaks SDL2 rendering ([5e8453a](https://github.com/kodingvibes/late-micro-games/commit/5e8453a8b67b8e91cefb6bcdcc5c17cc6797d160))
+
 ## [2.0.6](https://github.com/kodingvibes/late-micro-games/compare/v2.0.5...v2.0.6) (2026-07-27)
 
 
