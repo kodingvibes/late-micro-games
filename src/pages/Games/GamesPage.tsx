@@ -40,10 +40,6 @@ export function GamesPage() {
     if (id === "minesweeper") return <MinesweeperGame onBack={() => setActiveGame(null)} />;
   }
 
-  if (activeGame?.kind === "tic80") {
-    return <Tic80Player key={activeGame.cart.id} cart={activeGame.cart} onBack={() => setActiveGame(null)} />;
-  }
-
   return (
     <div className="min-h-screen bg-mf-surface p-6 relative overflow-hidden">
       {/* ponytail: game-themed doodle wallpaper under the cards. */}
@@ -78,6 +74,20 @@ export function GamesPage() {
             ))}
           </div>
         </>
+      )}
+
+      {activeGame?.kind === "tic80" && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-menu-backdrop"
+          onClick={() => setActiveGame(null)}
+        >
+          <div
+            className="relative w-full max-w-2xl mx-4 animate-menu-pop"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Tic80Player key={activeGame.cart.id} cart={activeGame.cart} onBack={() => setActiveGame(null)} />
+          </div>
+        </div>
       )}
     </div>
   );
