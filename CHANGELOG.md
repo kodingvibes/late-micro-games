@@ -1,3 +1,10 @@
+## [2.0.12](https://github.com/kodingvibes/late-micro-games/compare/v2.0.11...v2.0.12) (2026-07-27)
+
+
+### Bug Fixes
+
+* **tic80:** serve player from /micro/games/latest/ to avoid shell SPA fallback ([6d1fcac](https://github.com/kodingvibes/late-micro-games/commit/6d1fcac7312c83dcca5484905efd0240c9a05958))
+
 ## [2.0.11](https://github.com/kodingvibes/late-micro-games/compare/v2.0.10...v2.0.11) (2026-07-27)
 
 
