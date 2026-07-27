@@ -4,13 +4,15 @@ import { getBestScore } from "@/lib/leaderboard";
 import { TetrisGame } from "@/games/Tetris/TetrisGame";
 import { Twenty48Game } from "@/games/Twenty48/Twenty48Game";
 import { MinesweeperGame } from "@/games/Minesweeper/MinesweeperGame";
+import { GodotDemo } from "@/games/Godot/GodotDemo";
 
-type GameId = "tetris" | "2048" | "minesweeper";
+type GameId = "tetris" | "2048" | "minesweeper" | "godot-demo";
 
 const GAMES: { id: GameId; name: string; icon: string; description: string; accent: string }[] = [
   { id: "tetris", name: "Tetris", icon: "🧱", description: "Apilá y eliminá líneas", accent: "blue" },
   { id: "2048", name: "2048", icon: "🔢", description: "Uní fichas hasta 2048", accent: "amber" },
   { id: "minesweeper", name: "Buscaminas", icon: "💣", description: "Encontrá las minas", accent: "slate" },
+  { id: "godot-demo", name: "Dodge the Creeps", icon: "🎮", description: "Demo Godot original", accent: "green" },
 ];
 
 export function GamesPage() {
@@ -21,6 +23,7 @@ export function GamesPage() {
     if (id === "tetris") return <TetrisGame onBack={() => setActiveGame(null)} />;
     if (id === "2048") return <Twenty48Game onBack={() => setActiveGame(null)} />;
     if (id === "minesweeper") return <MinesweeperGame onBack={() => setActiveGame(null)} />;
+    if (id === "godot-demo") return <GodotDemo onBack={() => setActiveGame(null)} />;
   }
 
   return (
