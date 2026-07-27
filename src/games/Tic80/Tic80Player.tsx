@@ -32,7 +32,7 @@ export function Tic80Player({ cart, onBack }: Tic80PlayerProps) {
     <GameLayout title={cart.name} accent={cart.accent} onBack={onBack} score={null}>
       <iframe
         ref={iframeRef}
-        src={`/tic80-player.html?cart=${encodeURIComponent(cart.cartUrl)}&name=${encodeURIComponent(cart.name)}`}
+        src={`/micro/games/latest/tic80-player.html?cart=${encodeURIComponent(cart.cartUrl)}&name=${encodeURIComponent(cart.name)}`}
         className="w-full aspect-[240/136] rounded-lg bg-black border-0"
         style={{ imageRendering: "pixelated" }}
         title={cart.name}
