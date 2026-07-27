@@ -1,3 +1,10 @@
+## [2.1.1](https://github.com/kodingvibes/late-micro-games/compare/v2.1.0...v2.1.1) (2026-07-27)
+
+
+### Bug Fixes
+
+* **godot:** use absolute micro/games path for iframe src ([a663ee3](https://github.com/kodingvibes/late-micro-games/commit/a663ee3318624fe92a86d1ac914ba3ca5072f0b6))
+
 # [2.1.0](https://github.com/kodingvibes/late-micro-games/compare/v2.0.12...v2.1.0) (2026-07-27)
 
 
