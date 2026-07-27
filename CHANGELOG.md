@@ -1,3 +1,10 @@
+## [2.0.6](https://github.com/kodingvibes/late-micro-games/compare/v2.0.5...v2.0.6) (2026-07-27)
+
+
+### Bug Fixes
+
+* **tic80:** replace readAsync override with FS.createPreloadedFile to fix sandboxed cart loading ([12e0136](https://github.com/kodingvibes/late-micro-games/commit/12e013621ceb96e6ddef5b4aa2ca4b50f0f7bd4e))
+
 ## [2.0.5](https://github.com/kodingvibes/late-micro-games/compare/v2.0.4...v2.0.5) (2026-07-27)
 
 
