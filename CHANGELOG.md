@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/kodingvibes/late-micro-games/compare/v1.2.2...v1.3.0) (2026-07-27)
+
+
+### Features
+
+* **games:** add card shadow to GameCard button ([9aff6fc](https://github.com/kodingvibes/late-micro-games/commit/9aff6fc03ac6cf2a120cd0eacca15768df1b8bcf))
+
 ## [1.2.2](https://github.com/kodingvibes/late-micro-games/compare/v1.2.1...v1.2.2) (2026-07-27)
 
 
