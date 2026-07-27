@@ -1,3 +1,10 @@
+# [2.2.0](https://github.com/kodingvibes/late-micro-games/compare/v2.1.2...v2.2.0) (2026-07-27)
+
+
+### Features
+
+* **games:** replace React mini-games with Godot versions and add Snake + Space Invaders ([b71d5e1](https://github.com/kodingvibes/late-micro-games/commit/b71d5e1eab260f30d725b6a2efd59128a2b125fa))
+
 ## [2.1.2](https://github.com/kodingvibes/late-micro-games/compare/v2.1.1...v2.1.2) (2026-07-27)
 
 
