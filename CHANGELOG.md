@@ -1,3 +1,15 @@
+## [2.0.3](https://github.com/kodingvibes/late-micro-games/compare/v2.0.2...v2.0.3) (2026-07-27)
+
+
+### Bug Fixes
+
+* **tic80:** sandbox runtime in iframe, precache cart in MEMFS, robust download scripts ([e654621](https://github.com/kodingvibes/late-micro-games/commit/e654621a8c1540a3808d46bd52b448eb0f5078e1))
+
+
+### Reverts
+
+* Revert "fix(tic80): sandbox runtime in iframe, precache cart in MEMFS, robust download scripts" ([a3755cb](https://github.com/kodingvibes/late-micro-games/commit/a3755cbe388d47df438723e8fefd2f13f9659e65))
+
 ## [2.0.2](https://github.com/kodingvibes/late-micro-games/compare/v2.0.1...v2.0.2) (2026-07-27)
 
 
