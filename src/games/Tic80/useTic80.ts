@@ -4,9 +4,44 @@ export type PlayerState = "idle" | "booting" | "ready" | "error";
 
 const TIC80_JS = "https://tic80.com/js/1.1.2837/tic80.js";
 
+function injectScript(cartUrl: string, canvas: HTMLCanvasElement): () => void {
+  const prev = (window as any).Module;
+  (window as any).Module = {
+    locateFile: (f: string) => "https://tic80.com/js/1.1.2837/" + f,
+    canvas,
+    arguments: [cartUrl],
+    print: (m: string) => console.log("[tic80]", m),
+    printErr: (m: string) => console.error("[tic80]", m),
+    onRuntimeInitialized: () => {
+      document.dispatchEvent(new CustomEvent("tic80:ready"));
+    },
+    setStatus: (m: string) => {
+      if (m && m.includes("error"))
+        document.dispatchEvent(new CustomEvent("tic80:error", { detail: m }));
+    },
+  };
+
+  const existing = document.getElementById("tic80-script");
+  if (existing) existing.remove();
+
+  const script = document.createElement("script");
+  script.id = "tic80-script";
+  script.src = TIC80_JS + "?_=" + Date.now();
+  document.body.appendChild(script);
+
+  return () => {
+    const s = document.getElementById("tic80-script");
+    if (s) s.remove();
+    if ((window as any).Module === (window as any).__tic80_module) {
+      delete (window as any).__tic80_module;
+      delete (window as any).Module;
+    }
+  };
+}
+
 export function useTic80(
   cartUrl: string,
-  iframeRef: React.RefObject<HTMLIFrameElement | null>,
+  canvasRef: React.RefObject<HTMLCanvasElement | null>,
 ): { state: PlayerState; error: string | null } {
   const [state, setState] = useState<PlayerState>("booting");
   const [error, setError] = useState<string | null>(null);
@@ -14,70 +49,38 @@ export function useTic80(
 
   useEffect(() => {
     mountedRef.current = true;
-    const iframe = iframeRef.current;
-    if (!iframe) {
-      setState("error");
-      setError("No iframe");
-      return;
-    }
-
     setState("booting");
-    const doc = iframe.contentDocument;
-    if (!doc) {
+    setError(null);
+
+    const canvas = canvasRef.current;
+    if (!canvas) {
       setState("error");
-      setError("No iframe document");
-      return;
+      setError("Canvas no encontrado");
+      return () => {};
     }
 
-    doc.open();
-    doc.write(`
-<!DOCTYPE html>
-<html>
-<head>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#111}
-canvas{display:block;width:100%;aspect-ratio:240/136;max-width:720px;margin:0 auto;image-rendering:pixelated;outline:none;background:#000}
-canvas:focus{outline:none}
-</style>
-</head>
-<body>
-<canvas id="tic80-canvas" width="240" height="136" tabindex="0" oncontextmenu="event.preventDefault()" onmousedown="window.focus()"></canvas>
-<script>
-window.Module = {
-  locateFile: function(f){return 'https://tic80.com/js/1.1.2837/'+f},
-  canvas: document.getElementById('tic80-canvas'),
-  arguments: [${JSON.stringify(cartUrl)}],
-  print: function(m){console.log('[tic80]',m)},
-  printErr: function(m){console.error('[tic80]',m)},
-  onRuntimeInitialized: function(){
-    window.parent.postMessage({type:'tic80:ready'},'*');
-  },
-  setStatus: function(m){
-    if(m && m.includes('error')) window.parent.postMessage({type:'tic80:error',message:m},'*');
-  },
-};
-</script>
-<script src="${TIC80_JS}"></script>
-</body>
-</html>
-`);
-    doc.close();
+    const cleanup = injectScript(cartUrl, canvas);
 
-    const onMessage = (e: MessageEvent) => {
-      if (e.data?.type === "tic80:ready" && mountedRef.current) setState("ready");
-      if (e.data?.type === "tic80:error" && mountedRef.current) {
-        setError(e.data.message);
+    const onReady = () => {
+      if (mountedRef.current) setState("ready");
+    };
+    const onError = (e: Event) => {
+      if (mountedRef.current) {
+        setError((e as CustomEvent).detail || "Error al cargar");
         setState("error");
       }
     };
-    window.addEventListener("message", onMessage);
+
+    document.addEventListener("tic80:ready", onReady);
+    document.addEventListener("tic80:error", onError);
 
     return () => {
       mountedRef.current = false;
-      window.removeEventListener("message", onMessage);
+      document.removeEventListener("tic80:ready", onReady);
+      document.removeEventListener("tic80:error", onError);
+      cleanup();
     };
-  }, [cartUrl, iframeRef]);
+  }, [cartUrl, canvasRef]);
 
   return { state, error };
 }
