@@ -1,0 +1,18 @@
+[gd_scene load_steps=8 format=3 uid="uid://c2b5x8n3x0001"]
+
+[ext_resource type="Script" path="res://main.gd" id="1_main"]
+[ext_resource type="PackedScene" uid="uid://tetris00000001" path="res://scenes/tetris.tscn" id="2_tetris"]
+[ext_resource type="PackedScene" uid="uid://20480000000001" path="res://scenes/twenty48.tscn" id="3_2048"]
+[ext_resource type="PackedScene" uid="uid://minesw00000001" path="res://scenes/minesweeper.tscn" id="4_minesweeper"]
+[ext_resource type="PackedScene" uid="uid://snake0000000001" path="res://scenes/snake.tscn" id="5_snake"]
+[ext_resource type="PackedScene" uid="uid://spacei00000001" path="res://scenes/space_invaders.tscn" id="6_space"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_main")
+game_scenes = {
+"tetris": ExtResource("2_tetris"),
+"2048": ExtResource("3_2048"),
+"minesweeper": ExtResource("4_minesweeper"),
+"snake": ExtResource("5_snake"),
+"space_invaders": ExtResource("6_space")
+}

@@ -1,29 +1,37 @@
 import { useState } from "react";
 import { GameCard } from "@/components/GameCard";
 import { getBestScore } from "@/lib/leaderboard";
-import { TetrisGame } from "@/games/Tetris/TetrisGame";
-import { Twenty48Game } from "@/games/Twenty48/Twenty48Game";
-import { MinesweeperGame } from "@/games/Minesweeper/MinesweeperGame";
+import { GodotGame } from "@/games/Godot/GodotGame";
 import { GodotDemo } from "@/games/Godot/GodotDemo";
 
-type GameId = "tetris" | "2048" | "minesweeper" | "godot-demo";
+type GameId = "tetris" | "2048" | "minesweeper" | "snake" | "space-invaders" | "godot-demo";
 
 const GAMES: { id: GameId; name: string; icon: string; description: string; accent: string }[] = [
   { id: "tetris", name: "Tetris", icon: "🧱", description: "Apilá y eliminá líneas", accent: "blue" },
   { id: "2048", name: "2048", icon: "🔢", description: "Uní fichas hasta 2048", accent: "amber" },
   { id: "minesweeper", name: "Buscaminas", icon: "💣", description: "Encontrá las minas", accent: "slate" },
-  { id: "godot-demo", name: "Dodge the Creeps", icon: "🎮", description: "Demo Godot original", accent: "green" },
+  { id: "snake", name: "Snake", icon: "🐍", description: "Comé manzanas y crecé", accent: "green" },
+  { id: "space-invaders", name: "Space Invaders", icon: "👾", description: "Dispará a los aliens", accent: "purple" },
+  { id: "godot-demo", name: "Dodge the Creeps", icon: "🎮", description: "Demo Godot original", accent: "pink" },
 ];
+
+const GAME_TITLES: Record<string, string> = {
+  tetris: "Tetris",
+  "2048": "2048",
+  minesweeper: "Buscaminas",
+  snake: "Snake",
+  "space-invaders": "Space Invaders",
+};
 
 export function GamesPage() {
   const [activeGame, setActiveGame] = useState<GameId | null>(null);
 
   if (activeGame) {
     const id = activeGame;
-    if (id === "tetris") return <TetrisGame onBack={() => setActiveGame(null)} />;
-    if (id === "2048") return <Twenty48Game onBack={() => setActiveGame(null)} />;
-    if (id === "minesweeper") return <MinesweeperGame onBack={() => setActiveGame(null)} />;
     if (id === "godot-demo") return <GodotDemo onBack={() => setActiveGame(null)} />;
+    if (id in GAME_TITLES) {
+      return <GodotGame game={id} title={GAME_TITLES[id]} onBack={() => setActiveGame(null)} />;
+    }
   }
 
   return (

@@ -10,3 +10,9 @@ scripts/tic80-runtime/
 # Auto-generated standalone player assets (copied from scripts/tic80-runtime/ by build-tic80-runtime.mjs)
 public/tic80.js
 public/tic80.wasm
+
+# Godot editor cache and build artifacts
+godot-games/.godot/
+godot-games/build/
+godot-games/assets/*.import
+public/godot-games/
