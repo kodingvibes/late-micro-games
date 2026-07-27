@@ -1,3 +1,16 @@
+# [2.0.0](https://github.com/kodingvibes/late-micro-games/compare/v1.5.2...v2.0.0) (2026-07-27)
+
+
+### Features
+
+* **tic80:** self-host runtime instead of loading from tic80.com CDN ([f3c9219](https://github.com/kodingvibes/late-micro-games/commit/f3c9219e85ccd614f811481129042a3bdce3514f))
+
+
+### BREAKING CHANGES
+
+* **tic80:** the shell must now also serve the /tic80/
+static directory (dist/tic80/) from the document root.
+
 ## [1.5.2](https://github.com/kodingvibes/late-micro-games/compare/v1.5.1...v1.5.2) (2026-07-27)
 
 
