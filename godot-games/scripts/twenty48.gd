@@ -1,17 +1,18 @@
 extends Control
 
 const GRID_SIZE := 4
-const CELL := 100
-const GAP := 12
-const START_X := 60
-const START_Y := 100
+const HUD_HEIGHT := 80
+
+var cell: float = 100.0
+var gap: float = 12.0
+var board_size: float = 0.0
+var board_origin: Vector2 = Vector2.ZERO
 
 var grid: Array[Array] = []
 var score: int = 0
 var high_score: int = 0
 var game_over: bool = false
 var won: bool = false
-var animating: bool = false
 
 var colors := {
 	0: Color("#cdc1b4"),
@@ -28,29 +29,7 @@ var colors := {
 	2048: Color("#edc22e"),
 }
 
-@onready var score_lbl := Label.new()
-@onready var restart_btn := Button.new()
-
 func _ready():
-	custom_minimum_size = Vector2(GRID_SIZE * CELL + (GRID_SIZE + 1) * GAP + START_X * 2, GRID_SIZE * CELL + (GRID_SIZE + 1) * GAP + START_Y + 60)
-	set_anchors_preset(Control.PRESET_CENTER)
-	
-	score_lbl.text = "Score: 0   High: 0"
-	score_lbl.position = Vector2(START_X, 20)
-	score_lbl.add_theme_font_size_override("font_size", 24)
-	add_child(score_lbl)
-	
-	restart_btn.text = "Reiniciar (R)"
-	restart_btn.position = Vector2(START_X + 300, 20)
-	restart_btn.pressed.connect(start_game)
-	add_child(restart_btn)
-	
-	var help := Label.new()
-	help.text = "Flechas: mover fichas · R: reiniciar"
-	help.position = Vector2(START_X, 55)
-	help.add_theme_font_size_override("font_size", 14)
-	add_child(help)
-	
 	start_game()
 
 func start_game():
@@ -63,14 +42,9 @@ func start_game():
 	score = 0
 	game_over = false
 	won = false
-	animating = false
 	spawn_tile()
 	spawn_tile()
-	update_ui()
 	queue_redraw()
-
-func update_ui():
-	score_lbl.text = "Score: %d   High: %d" % [score, max(high_score, score)]
 
 func spawn_tile():
 	var empty: Array[Vector2i] = []
@@ -83,7 +57,7 @@ func spawn_tile():
 	var pos: Vector2i = empty[randi() % empty.size()]
 	grid[pos.y][pos.x] = 2 if randf() < 0.9 else 4
 
-func slide_line(line: Array[int]) -> Array[int]:
+func slide_line(line: Array) -> Array:
 	var filtered: Array[int] = []
 	for v in line:
 		if v != 0:
@@ -185,33 +159,50 @@ func _input(event):
 			check_win()
 			if not can_move():
 				game_over = true
-			update_ui()
 			queue_redraw()
+
+func recompute_layout():
+	var avail: float = min(size.x, size.y - HUD_HEIGHT) - 40
+	cell = max(40.0, (avail - (GRID_SIZE + 1) * 12) / GRID_SIZE)
+	gap = max(6.0, cell * 0.12)
+	board_size = GRID_SIZE * cell + (GRID_SIZE + 1) * gap
+	board_origin = Vector2((size.x - board_size) / 2.0, HUD_HEIGHT + (size.y - HUD_HEIGHT - board_size) / 2.0)
 
 func get_text_color(value: int) -> Color:
 	return Color.BLACK if value <= 4 else Color.WHITE
 
-func get_font_size(value: int) -> int:
-	return 28 if value < 1000 else 22
+func get_font_size(value: int) -> float:
+	var ratio := cell / 100.0
+	return (28 if value < 1000 else 22) * ratio * 2.0
 
 func _draw():
-	var board_size := GRID_SIZE * CELL + (GRID_SIZE + 1) * GAP
+	recompute_layout()
+	var font := get_theme_default_font()
+	draw_rect(Rect2(Vector2.ZERO, size), Color("#faf8ef"), true)
+
+	# HUD
+	draw_string(font, Vector2(20, 30), "Score: %d   High: %d" % [score, max(high_score, score)], HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color("#776e65"))
+	draw_string(font, Vector2(20, 55), "Flechas/WASD: mover · R: reiniciar", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("#776e65"))
+
 	# Board background
-	draw_rect(Rect2(Vector2(START_X, START_Y), Vector2(board_size, board_size)), Color("#bbada0"), true)
-	
+	draw_rect(Rect2(board_origin, Vector2(board_size, board_size)), Color("#bbada0"), true)
+
 	for y in range(GRID_SIZE):
 		for x in range(GRID_SIZE):
 			var value: int = grid[y][x]
-			var rect_pos := Vector2(START_X + GAP + x * (CELL + GAP), START_Y + GAP + y * (CELL + GAP))
-			draw_rect(Rect2(rect_pos, Vector2(CELL, CELL)), colors.get(value, Color("#3c3a32")), true)
+			var rect_pos := board_origin + Vector2(gap + x * (cell + gap), gap + y * (cell + gap))
+			draw_rect(Rect2(rect_pos, Vector2(cell, cell)), colors.get(value, Color("#3c3a32")), true)
 			if value > 0:
 				var text := str(value)
 				var fsize := get_font_size(value)
-				var tsize := get_theme_default_font().get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, fsize)
-				var tpos := rect_pos + Vector2((CELL - tsize.x) / 2.0, (CELL + tsize.y / 2.0) / 2.0 + fsize / 2.0)
-				draw_string(get_theme_default_font(), tpos, text, HORIZONTAL_ALIGNMENT_CENTER, -1, fsize, get_text_color(value))
-	
+				var tsize := font.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, fsize)
+				var tpos := rect_pos + Vector2((cell - tsize.x) / 2.0, (cell - tsize.y) / 2.0 + fsize * 0.8)
+				draw_string(font, tpos, text, HORIZONTAL_ALIGNMENT_CENTER, -1, fsize, get_text_color(value))
+
 	if game_over:
-		draw_string(get_theme_default_font(), Vector2(START_X + board_size / 2.0 - 70, START_Y + board_size / 2.0), "GAME OVER", HORIZONTAL_ALIGNMENT_CENTER, -1, 32, Color(0.8, 0, 0, 1))
+		var center := board_origin + Vector2(board_size / 2.0, board_size / 2.0)
+		draw_string(font, center + Vector2(-90, -10), "GAME OVER", HORIZONTAL_ALIGNMENT_CENTER, -1, 36, Color(0.8, 0, 0, 1))
+		draw_string(font, center + Vector2(-70, 30), "R para reiniciar", HORIZONTAL_ALIGNMENT_CENTER, -1, 18, Color.DARK_RED)
 	elif won:
-		draw_string(get_theme_default_font(), Vector2(START_X + board_size / 2.0 - 50, START_Y + board_size / 2.0), "¡2048!", HORIZONTAL_ALIGNMENT_CENTER, -1, 32, Color(0, 0.7, 0, 1))
+		var center := board_origin + Vector2(board_size / 2.0, board_size / 2.0)
+		draw_string(font, center + Vector2(-50, -10), "¡2048!", HORIZONTAL_ALIGNMENT_CENTER, -1, 36, Color(0, 0.5, 0, 1))

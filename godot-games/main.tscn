@@ -7,7 +7,13 @@
 [ext_resource type="PackedScene" uid="uid://snake0000000001" path="res://scenes/snake.tscn" id="5_snake"]
 [ext_resource type="PackedScene" uid="uid://spacei00000001" path="res://scenes/space_invaders.tscn" id="6_space"]
 
-[node name="Main" type="Node2D"]
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 script = ExtResource("1_main")
 game_scenes = {
 "tetris": ExtResource("2_tetris"),

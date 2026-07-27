@@ -1,4 +1,4 @@
-extends Node2D
+extends Control
 
 @export var game_scenes: Dictionary = {
 	"tetris": preload("res://scenes/tetris.tscn"),
@@ -14,7 +14,7 @@ func _ready():
 		var q = JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('game') || 'menu'")
 		if q is String:
 			game = q
-	
+
 	var scene = game_scenes.get(game)
 	if scene == null:
 		show_menu()
@@ -34,4 +34,5 @@ func start_game(scene: PackedScene):
 	for c in get_children():
 		c.queue_free()
 	var instance = scene.instantiate()
+	instance.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(instance)
