@@ -1,3 +1,10 @@
+## [2.0.9](https://github.com/kodingvibes/late-micro-games/compare/v2.0.8...v2.0.9) (2026-07-27)
+
+
+### Bug Fixes
+
+* **tic80:** don't restore prev Module on cleanup (causes saveAs crash) ([53b0dbf](https://github.com/kodingvibes/late-micro-games/commit/53b0dbff91ce204f5be736a5193eac4acd16a892))
+
 ## [2.0.8](https://github.com/kodingvibes/late-micro-games/compare/v2.0.7...v2.0.8) (2026-07-27)
 
 
