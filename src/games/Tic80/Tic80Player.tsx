@@ -1,6 +1,5 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { GameLayout } from "@/components/GameLayout";
-import { useTic80 } from "@/games/Tic80/useTic80";
 import type { Tic80Game } from "@/lib/tic80Catalog";
 
 interface Tic80PlayerProps {
@@ -9,36 +8,36 @@ interface Tic80PlayerProps {
 }
 
 export function Tic80Player({ cart, onBack }: Tic80PlayerProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { state, error } = useTic80(cart, canvasRef);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // The TIC-80 Emscripten runtime is stateful and global (window.Module,
+  // window.FS, window.Browser). Injecting it into the React shell
+  // fights with React's lifecycle and the other micros. The simplest
+  // thing that works: load the runtime in its own iframe so it gets
+  // a clean window. This is what tic80.com's own webapp does.
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    const onMessage = (e: MessageEvent) => {
+      // ponytail: the iframe can post messages to navigate back. We
+      // don't need this today, but it gives us a hook for future
+      // "close on Escape" wiring without changing the contract.
+      if (e.data === "tic80:close") onBack();
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [onBack]);
 
   return (
     <GameLayout title={cart.name} accent={cart.accent} onBack={onBack} score={null}>
-      <div className="relative w-full max-w-2xl">
-        <canvas
-          ref={canvasRef}
-          width={240}
-          height={136}
-          className="w-full aspect-[240/136] rounded-lg bg-black image-rendering-pixelated"
-          onContextMenu={(e) => e.preventDefault()}
-          onMouseDown={() => canvasRef.current?.focus()}
-          tabIndex={0}
-        />
-        {state === "booting" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg pointer-events-none">
-            <span className="text-slate-400 text-sm animate-pulse">
-              Cargando juego...
-            </span>
-          </div>
-        )}
-        {state === "error" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/80 rounded-lg p-4 text-center">
-            <span className="text-red-400 text-sm">
-              {error || "Error al cargar el juego"}
-            </span>
-          </div>
-        )}
-      </div>
+      <iframe
+        ref={iframeRef}
+        src={`/tic80-player.html?cart=${encodeURIComponent(cart.cartUrl)}&name=${encodeURIComponent(cart.name)}`}
+        className="w-full aspect-[240/136] rounded-lg bg-black border-0"
+        style={{ imageRendering: "pixelated" }}
+        title={cart.name}
+        allow="autoplay"
+      />
     </GameLayout>
   );
 }

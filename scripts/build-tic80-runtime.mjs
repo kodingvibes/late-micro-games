@@ -122,8 +122,18 @@ export const TIC80_WASM_B64: string = ${JSON.stringify(wasmBase64)};
 mkdirSync(dirname(TARGET_FILE), { recursive: true });
 writeFileSync(TARGET_FILE, tsContent);
 
+// Also copy the raw runtime files to public/ so the standalone
+// tic80-player.html can fetch them directly. The player page is a
+// plain HTML file served from the same origin — it can't reach the
+// bundled base64, so it loads the JS and WASM over HTTP instead.
+const PUBLIC_DIR = join(__dirname, "..", "public");
+mkdirSync(PUBLIC_DIR, { recursive: true });
+writeFileSync(join(PUBLIC_DIR, "tic80.js"), jsBytes);
+writeFileSync(join(PUBLIC_DIR, "tic80.wasm"), wasmBytes);
+
 const rel = relative(process.cwd(), TARGET_FILE);
 console.log(`  ✓ generated ${rel}`);
+console.log(`  ✓ copied tic80.js + tic80.wasm to public/`);
 console.log(
   `    JS:  ${(jsBytes.length / 1024).toFixed(0)} KB (${(jsBase64.length / 1024).toFixed(0)} KB base64)`,
 );
