@@ -24,9 +24,11 @@ export function GamesPage() {
   if (activeGame === "minesweeper") return <MinesweeperGame onBack={() => setActiveGame(null)} />;
 
   return (
-    <div className="min-h-screen bg-mf-surface p-6">
-      <h1 className="text-2xl font-bold text-slate-200 text-center mb-6">🎮 Juegos</h1>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto">
+    <div className="min-h-screen bg-mf-surface p-6 relative overflow-hidden">
+      {/* ponytail: game-themed doodle wallpaper under the cards. */}
+      <div className="bg-doodles bg-games-doodles" aria-hidden="true" />
+      <h1 className="relative z-10 text-2xl font-bold text-slate-200 text-center mb-6">🎮 Juegos</h1>
+      <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto">
         {GAMES.map(game => (
           <GameCard
             key={game.id}
