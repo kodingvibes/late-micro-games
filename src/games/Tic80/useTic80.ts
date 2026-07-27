@@ -27,17 +27,10 @@ function injectRuntime(
   // its canvas context — the runtime boots, the cart loads, but the
   // framebuffer never gets drawn to.
 
-  // ponytail: write the cart directly into the MEMFS sandbox folder
-  // (FS.cwd()) before injecting the runtime. The TIC-80 web build's
-  // `emsStart` only sets up the preloaded-file flow when `argv[1]`
-  // ends in `.tic`; if we don't pass it as a CLI arg, the C side
-  // boots into the studio and looks for the cart at the configured
-  // `console->rom.path`. We can write the cart there directly, but
-  // the path is locked to the sandbox. Easiest: pass the cart name
-  // as the first arg so `emsStart` sets up the preloader, AND drop
-  // the cart bytes into MEMFS at the path the preloader would have
-  // created, AND seed `Module.filePreloaded = true` so the bootstrap
-  // tick fires `start()` on its very first poll.
+  // ponytail: write the cart into MEMFS via `preRun` (called before
+  // WASM compiles) so the C++ side finds it at the sandbox path.
+  // Seed `filePreloaded = true` so the bootstrap tick fires `start()`
+  // immediately instead of waiting for the preloader XHR (which 404s).
   const cartName = cartUrl.split("/").pop() || "cart.tic";
   (window as any).Module = {
     canvas,
@@ -46,19 +39,18 @@ function injectRuntime(
     filePreloaded: true,
     print: (m: string) => console.log("[tic80]", m),
     printErr: (m: string) => console.error("[tic80]", m),
+    preRun: [
+      () => {
+        try {
+          const sandbox = "/com.nesbox.tic/TIC-80";
+          (window as any).FS.mkdirTree(sandbox);
+          (window as any).FS.writeFile(sandbox + "/" + cartName, cartBytes);
+        } catch (e) {
+          console.error("[tic80] cart preload failed:", e);
+        }
+      },
+    ],
     onRuntimeInitialized: () => {
-      // ponytail: the preloader would have written the cart at
-      // `<sandbox>/<cartName>`. We just drop the bytes there
-      // synchronously and seed `filePreloaded = true` so the
-      // bootstrap tick fires `start()` immediately instead of
-      // waiting for an XHR that will never come.
-      try {
-        const sandbox = "/com.nesbox.tic/TIC-80";
-        (window as any).FS.mkdirTree(sandbox);
-        (window as any).FS.writeFile(sandbox + "/" + cartName, cartBytes);
-      } catch (e) {
-        console.error("[tic80] cart preload failed:", e);
-      }
       document.dispatchEvent(new CustomEvent("tic80:ready"));
     },
     setStatus: (m: string) => {
@@ -75,7 +67,6 @@ function injectRuntime(
   return () => {
     script.remove();
     URL.revokeObjectURL(url);
-    // Don't touch window.Module — see the note above.
   };
 }
 
