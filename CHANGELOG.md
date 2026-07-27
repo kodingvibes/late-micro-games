@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/kodingvibes/late-micro-games/compare/v2.0.0...v2.0.1) (2026-07-27)
+
+
+### Bug Fixes
+
+* **tic80:** inline runtime as base64 in a code-split chunk ([52319a8](https://github.com/kodingvibes/late-micro-games/commit/52319a84c081e12050354bcccb51475fbf06f9de))
+
 # [2.0.0](https://github.com/kodingvibes/late-micro-games/compare/v1.5.2...v2.0.0) (2026-07-27)
 
 
