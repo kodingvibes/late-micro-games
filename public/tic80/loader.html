@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TIC-80 loader</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: #000; width: 240px; height: 136px; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas { display: block; image-rendering: pixelated; width: 240px; height: 136px; }
+</style>
+</head>
+<body>
+<canvas id="tic80-canvas" width="240" height="136" tabindex="0"></canvas>
+<script>
+(function () {
+  "use strict";
+
+  // ---------- messaging helpers ----------
+  function post(type, detail) {
+    try {
+      parent.postMessage({ type: type, detail: detail || null }, "*");
+    } catch (e) {
+      /* parent gone, nothing to do */
+    }
+  }
+  function postLog(level, message) {
+    try {
+      parent.postMessage({ type: "log", level: level, message: String(message) }, "*");
+    } catch (e) { /* ignore */ }
+  }
+  function postError(detail) { post("error", detail); }
+  function postReady() { post("ready"); }
+  function postBooting() { post("booting"); }
+
+  // ---------- uncaught error reporting ----------
+  window.addEventListener("error", function (ev) {
+    var msg = (ev && (ev.message || (ev.error && ev.error.message))) || "Runtime error";
+    postError(msg);
+  });
+  window.addEventListener("unhandledrejection", function (ev) {
+    var reason = ev && ev.reason;
+    var msg = (reason && (reason.message || String(reason))) || "Unhandled rejection";
+    postError(msg);
+  });
+
+  // ---------- runtime injection ----------
+  // Runs in the iframe, isolated from the parent's globals. We only ever touch `window.Module`
+  // inside the iframe; the parent never sees it. Cleanup is just `iframe.remove()`.
+  function handleInit(jsBytes, wasmBytes, cartBytes, cartName) {
+    // Lazy-refresh the canvas in case the parent remounted the host.
+    var canvas = document.getElementById("tic80-canvas");
+    if (!canvas) {
+      postError("Canvas not found in iframe");
+      return;
+    }
+
+    // Blob URL lets us load the JS without affecting the parent document.
+    var blob = new Blob([jsBytes], { type: "text/javascript" });
+    var scriptUrl = URL.createObjectURL(blob);
+
+    // Stash cart bytes for the readAsync override (see below).
+    window.__lateCartBytes = cartBytes;
+    window.__lateCartName = cartName;
+
+    window.Module = {
+      canvas: canvas,
+      arguments: [cartName],
+      wasmBinary: wasmBytes,
+      preRun: [
+        function () {
+          try {
+            if (typeof FS === "undefined") {
+              postError("FS not available at preRun");
+              return;
+            }
+            // If a previous cart with the same name lingered, drop it first.
+            try { FS.unlink("/" + cartName); } catch (e) { /* not there yet */ }
+            FS.createDataFile("/", cartName, cartBytes, true, true);
+          } catch (e) {
+            postError("FS.createDataFile failed: " + (e && e.message ? e.message : e));
+          }
+        },
+      ],
+      print: function (m) { postLog("log", m); },
+      printErr: function (m) { postLog("error", m); },
+      onRuntimeInitialized: function () {
+        postReady();
+      },
+      setStatus: function (m) {
+        if (typeof m === "string" && m.toLowerCase().indexOf("error") !== -1) {
+          postError(m);
+        }
+      },
+    };
+
+    // Override readAsync so the runtime pulls the cart from MEMFS instead of doing
+    // an XHR to tic80.com. readAsync(url, onload, onerror) — url can be a string or
+    // a Uint8Array (for paths already in MEMFS). We only intercept string URLs that
+    // match the requested cart name; everything else falls back to the original.
+    var originalReadAsync = window.readAsync;
+    window.readAsync = function (url, onload, onerror) {
+      try {
+        var name = null;
+        if (typeof url === "string") {
+          // Strip a leading slash — the runtime sometimes passes "/cart.tic".
+          name = url.charAt(0) === "/" ? url.substring(1) : url;
+        }
+        if (name && name === cartName && typeof FS !== "undefined") {
+          var data = FS.readFile("/" + name, { encoding: "binary" });
+          if (data && data.buffer) {
+            onload(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+            return;
+          }
+        }
+      } catch (e) {
+        if (onerror) onerror(e);
+        return;
+      }
+      if (typeof originalReadAsync === "function") {
+        originalReadAsync(url, onload, onerror);
+      } else if (onerror) {
+        onerror();
+      }
+    };
+
+    var script = document.createElement("script");
+    script.src = scriptUrl;
+    script.onerror = function () {
+      postError("Failed to load TIC-80 runtime script");
+    };
+    document.body.appendChild(script);
+  }
+
+  // ---------- message channel ----------
+  // Only accept init from the actual parent window. We track ready state to avoid
+  // double-init if the parent re-sends (e.g. on re-mount).
+  var initialized = false;
+  var bootTimeoutId = null;
+
+  window.addEventListener("message", function (event) {
+    if (event.source !== parent) return;
+    var data = event.data;
+    if (!data || typeof data !== "object") return;
+    if (data.type !== "init" && data.type !== "destroy") return;
+
+    if (data.type === "destroy") {
+      if (bootTimeoutId !== null) {
+        clearTimeout(bootTimeoutId);
+        bootTimeoutId = null;
+      }
+      // Best-effort: drop Module so the GC can reclaim buffers.
+      try { delete window.Module; } catch (e) { window.Module = undefined; }
+      return;
+    }
+
+    if (initialized) return;
+    initialized = true;
+
+    try {
+      postBooting();
+
+      // 30s watchdog: if the runtime never reports ready, give up.
+      bootTimeoutId = setTimeout(function () {
+        postError("Tiempo de carga agotado (30s)");
+        bootTimeoutId = null;
+      }, 30_000);
+
+      var jsBytes = new Uint8Array(data.jsBytes);
+      var wasmBytes = new Uint8Array(data.wasmBytes);
+      var cartBytes = new Uint8Array(data.cartBytes);
+      var cartName = String(data.cartName || "cart.tic");
+      handleInit(jsBytes, wasmBytes, cartBytes, cartName);
+    } catch (e) {
+      postError("handleInit threw: " + (e && e.message ? e.message : e));
+    }
+  });
+
+  // Tell the parent we're alive and ready to receive init.
+  post("booting");
+})();
+</script>
+</body>
+</html>
