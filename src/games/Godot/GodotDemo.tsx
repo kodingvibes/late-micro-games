@@ -25,11 +25,11 @@ export function GodotDemo({ onBack }: GodotDemoProps) {
         <h2 className="text-slate-200 font-semibold">Dodge the Creeps — Godot Demo</h2>
         <div className="w-16" />
       </div>
-      <div className="flex-1 min-h-0 relative">
+      <div className="flex-1 relative" style={{ minHeight: "70vh" }}>
         <iframe
           ref={iframeRef}
           src="/micro/games/latest/godot-demo/godot-demo.html"
-          className="w-full h-full border-0"
+          className="absolute inset-0 w-full h-full border-0"
           allow="fullscreen; autoplay"
           title="Godot demo"
         />
