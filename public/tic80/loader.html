@@ -86,52 +86,50 @@
         // 2) The runtime script (tic80.js) loads asynchronously via a <script>
         //    tag.  When it executes, it overwrites `window.readAsync` with its
         //    own XHR-based version, which *also* overwrites the loader's earlier
-        //    override (lines 131-145 below).  Since the iframe is sandboxed with
-        //    `allow-scripts` only (no `allow-same-origin`), XHR to any URL will
-        //    fail.  We re-apply our MEMFS-based override here, *after* the
-        //    runtime has finished loading but *before* `callMain` runs (which
-        //    triggers `FS.createPreloadedFile` → `asyncLoad` → `readAsync`).
-        //    Capture the runtime's XHR readAsync as the fallback for non-cart
-        //    resources (e.g. data files bundled with the cart).
-        var runtimeReadAsync = window.readAsync;
-        window.readAsync = function (url, onload, onerror) {
-          try {
-            // The runtime passes the full cart URL (e.g.
-            // "https://tic80.com/cart/.../palette_demo.tic") to readAsync.
-            // We check if the URL ends with the cart name.
-            if (typeof url === "string" && cartName && typeof FS !== "undefined") {
-              var idx = url.lastIndexOf("/");
-              var basename = idx >= 0 ? url.substring(idx + 1) : url;
-              // Strip query/hash if present
-              var qIdx = basename.indexOf("?");
-              if (qIdx >= 0) basename = basename.substring(0, qIdx);
-              var hIdx = basename.indexOf("#");
-              if (hIdx >= 0) basename = basename.substring(0, hIdx);
-              if (basename === cartName) {
-                var data = FS.readFile("/" + cartName, { encoding: "binary" });
-                if (data && data.buffer) {
-                  // IMPORTANT: Use setTimeout to make the callback async.
-                  // Emscripten's asyncLoad adds a run dependency AFTER
-                  // readAsync returns.  If we call onload synchronously,
-                  // the dependency is removed before it's added, causing
-                  // the runtime to hang forever waiting for it.
-                  setTimeout(function () {
-                    onload(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
-                  }, 0);
-                  return;
+        //    override.  Since the iframe is sandboxed with `allow-scripts` only
+        //    (no `allow-same-origin`), XHR to any URL will fail.
+        //
+        //    We cannot simply re-override `readAsync` because Emscripten's
+        //    `asyncLoad` calls `addRunDependency` AFTER `readAsync` returns.
+        //    If we call `onload` synchronously, the dependency is removed
+        //    before it is added, causing a permanent hang.  Using
+        //    `setTimeout(0)` would fix the ordering, but the WASM main loop
+        //    runs synchronously and never yields to the event loop, so the
+        //    timeout never fires.
+        //
+        //    Instead, we override `FS.createPreloadedFile` itself.  When the
+        //    URL matches our cart, we serve the data directly from MEMFS
+        //    without going through `asyncLoad` → `readAsync` at all.  This
+        //    avoids both the XHR failure and the dependency race condition.
+        var originalCreatePreloadedFile = FS.createPreloadedFile;
+        FS.createPreloadedFile = function (parent, name, url, canRead, canWrite, onload, onerror, dontCreateFile, canOwn, preFinish) {
+          // Check if this is our cart file.
+          if (typeof url === "string" && cartName) {
+            var idx = url.lastIndexOf("/");
+            var basename = idx >= 0 ? url.substring(idx + 1) : url;
+            var qIdx = basename.indexOf("?");
+            if (qIdx >= 0) basename = basename.substring(0, qIdx);
+            var hIdx = basename.indexOf("#");
+            if (hIdx >= 0) basename = basename.substring(0, hIdx);
+            if (basename === cartName) {
+              // Serve from MEMFS directly — no asyncLoad, no race condition.
+              var fullname = name ? PATH_FS.resolve(PATH.join2(parent, name)) : parent;
+              var dep = getUniqueRunDependency("cp " + fullname);
+              addRunDependency(dep);
+              function finish() {
+                if (preFinish) preFinish();
+                if (!dontCreateFile) {
+                  FS_createDataFile(parent, name, cartBytes, canRead, canWrite, canOwn);
                 }
+                if (onload) onload();
+                removeRunDependency(dep);
               }
+              finish();
+              return;
             }
-          } catch (e) {
-            if (onerror) onerror(e);
-            return;
           }
-          // Fallback: runtime's XHR readAsync for non-cart resources.
-          if (typeof runtimeReadAsync === "function") {
-            runtimeReadAsync(url, onload, onerror);
-          } else if (onerror) {
-            onerror();
-          }
+          // Fall through to the original for non-cart resources.
+          originalCreatePreloadedFile(parent, name, url, canRead, canWrite, onload, onerror, dontCreateFile, canOwn, preFinish);
         };
         postReady();
       },
