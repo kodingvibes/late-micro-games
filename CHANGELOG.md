@@ -1,3 +1,10 @@
+# [2.4.0](https://github.com/kodingvibes/late-micro-games/compare/v2.3.1...v2.4.0) (2026-07-28)
+
+
+### Features
+
+* **games:** add 6th Phaser game, DSEG14 font, shared theme and polished HUD ([e2461ef](https://github.com/kodingvibes/late-micro-games/commit/e2461efa71f02c5a0b473fdb93fb58252fbc69c4))
+
 ## [2.3.1](https://github.com/kodingvibes/late-micro-games/compare/v2.3.0...v2.3.1) (2026-07-27)
 
 
