@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import type { PhaserGameFactory } from "../shared/types";
+import { PALETTE, HEX, FONTS } from "../shared/theme";
 
 const ROWS = 5;
 const COLS = 8;
@@ -21,20 +22,23 @@ class SpaceInvadersScene extends Phaser.Scene {
   private paused = false;
   private graphics!: Phaser.GameObjects.Graphics;
   private scoreText!: Phaser.GameObjects.Text;
+  private livesText!: Phaser.GameObjects.Text;
+  private overlay!: Phaser.GameObjects.Container;
   private playW = 600;
   private playH = 500;
   private ox = 0;
   private oy = 80;
   private scale_ = 1;
 
-  constructor() {
-    super("SpaceInvaders");
-  }
+  constructor() { super("SpaceInvaders"); }
 
   create() {
     this.graphics = this.add.graphics();
-    this.scoreText = this.add.text(10, 10, "Score: 0   Lives: 3", { fontSize: "18px", color: "#fff" });
-    this.add.text(10, 40, "Flechas/A,D: mover · Espacio: disparar · P: pausa · R: reiniciar", { fontSize: "12px", color: "#aaa" });
+    this.add.text(20, 12, "SCORE", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
+    this.scoreText = this.add.text(20, 24, "0", { fontSize: "24px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } });
+    this.add.text(140, 12, "LIVES", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
+    this.livesText = this.add.text(140, 24, "3", { fontSize: "24px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } });
+    this.overlay = this.add.container(0, 0);
     this.input.keyboard?.on("keydown", this.handleKey, this);
     this.input.keyboard?.addCapture("SPACE,LEFT,RIGHT,UP,DOWN,A,D,W,S,P,R");
     this.scale.on("resize", () => this.draw(), this);
@@ -57,7 +61,8 @@ class SpaceInvadersScene extends Phaser.Scene {
         this.aliens.push({ x: 50 * this.scale_ + c * 50 * this.scale_, y: 40 * this.scale_ + r * 40 * this.scale_, alive: true });
       }
     }
-    this.scoreText.setText(`Score: ${this.score}   Lives: ${this.lives}`);
+    this.scoreText.setText(String(this.score));
+    this.livesText.setText(String(this.lives));
     this.draw();
   }
 
@@ -69,7 +74,7 @@ class SpaceInvadersScene extends Phaser.Scene {
     this.scale_ = Math.min(this.playW / 600, this.playH / 500);
     this.playerW = 40 * this.scale_;
     this.ox = (w - this.playW) / 2;
-    this.oy = 80 + (h - 80 - this.playH) / 2;
+    this.oy = Math.max(70, 80 + (h - 80 - this.playH) / 2);
   }
 
   private handleKey(e: KeyboardEvent) {
@@ -135,7 +140,8 @@ class SpaceInvadersScene extends Phaser.Scene {
       this.score += 100;
       this.reset();
     }
-    this.scoreText.setText(`Score: ${this.score}   Lives: ${this.lives}`);
+    this.scoreText.setText(String(this.score));
+    this.livesText.setText(String(this.lives));
     this.draw();
   }
 
@@ -143,25 +149,60 @@ class SpaceInvadersScene extends Phaser.Scene {
     this.layout();
     const g = this.graphics;
     g.clear();
+    this.overlay.removeAll(true);
     const w = this.scale.width;
-    g.fillStyle(0x050510, 1);
-    g.fillRect(0, 0, w, this.scale.height);
-    g.fillStyle(0x000000, 1);
+    const h = this.scale.height;
+    g.fillStyle(PALETTE.bg, 1);
+    g.fillRect(0, 0, w, h);
+
+    // instructions at bottom
+    this.add.text(20, h - 26, "Flechas/A,D: mover · Espacio: disparar · P: pausa · R: reiniciar", { fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
+
+    g.fillStyle(PALETTE.surface, 1);
+    g.fillRoundedRect(this.ox - 8, this.oy - 8, this.playW + 16, this.playH + 16, 14);
+
+    g.fillStyle(PALETTE.surfaceLight, 1);
     g.fillRect(this.ox, this.oy, this.playW, this.playH);
+
     const pw = this.playerW, ph = 20 * this.scale_;
-    g.fillStyle(0x00e0ff, 1);
-    g.fillRect(this.ox + this.playerX, this.oy + this.playH - ph - 10 * this.scale_, pw, ph);
+    g.fillStyle(PALETTE.cyan, 0.35);
+    g.fillRoundedRect(this.ox + this.playerX - 6, this.oy + this.playH - ph - 10 * this.scale_ - 6, pw + 12, ph + 12, 6);
+    g.fillStyle(PALETTE.cyan, 1);
+    g.fillRoundedRect(this.ox + this.playerX, this.oy + this.playH - ph - 10 * this.scale_, pw, ph, 4);
+    g.fillStyle(0xffffff, 0.6);
+    g.fillCircle(this.ox + this.playerX + pw * 0.3, this.oy + this.playH - ph - 10 * this.scale_ + ph * 0.3, ph * 0.2);
+
     const bw = 4 * this.scale_, bh = 10 * this.scale_;
-    g.fillStyle(0xffff00, 1);
-    for (const b of this.bullets) g.fillRect(this.ox + b.x - bw / 2, this.oy + b.y, bw, bh);
+    for (const b of this.bullets) {
+      g.fillStyle(PALETTE.yellow, 0.45);
+      g.fillCircle(this.ox + b.x, this.oy + b.y + bh / 2, bw * 2);
+      g.fillStyle(PALETTE.yellow, 1);
+      g.fillCircle(this.ox + b.x, this.oy + b.y + bh / 2, bw * 0.7);
+      g.fillStyle(0xffffff, 0.8);
+      g.fillCircle(this.ox + b.x, this.oy + b.y + bh / 2, bw * 0.3);
+    }
+
     const aw = 30 * this.scale_, ah = 20 * this.scale_;
-    g.fillStyle(0x00ff00, 1);
-    for (const a of this.aliens) if (a.alive) g.fillRect(this.ox + a.x, this.oy + a.y, aw, ah);
-    g.fillStyle(0x000000, 1);
-    for (const a of this.aliens) if (a.alive) g.fillRect(this.ox + a.x + aw * 0.2, this.oy + a.y + ah * 0.3, aw * 0.6, ah * 0.2);
+    for (const a of this.aliens) if (a.alive) {
+      const alienColor = (this.aliens.indexOf(a) % 3 === 0) ? PALETTE.green : ((this.aliens.indexOf(a) % 3 === 1) ? PALETTE.lime : PALETTE.accentSoft);
+      g.fillStyle(alienColor, 0.25);
+      g.fillRoundedRect(this.ox + a.x - 4, this.oy + a.y - 4, aw + 8, ah + 8, 4);
+      g.fillStyle(alienColor, 1);
+      g.fillRoundedRect(this.ox + a.x, this.oy + a.y, aw, ah, 4);
+      g.fillStyle(PALETTE.bg, 1);
+      g.fillRoundedRect(this.ox + a.x + aw * 0.2, this.oy + a.y + ah * 0.3, aw * 0.6, ah * 0.2, 2);
+      g.fillStyle(0xffffff, 0.5);
+      g.fillCircle(this.ox + a.x + aw * 0.25, this.oy + a.y + ah * 0.2, aw * 0.08);
+      g.fillCircle(this.ox + a.x + aw * 0.75, this.oy + a.y + ah * 0.2, aw * 0.08);
+    }
+
     if (this.gameOver) {
-      this.add.text(this.ox + this.playW / 2, this.oy + this.playH / 2 - 10, "GAME OVER", { fontSize: "32px", color: "#fff" }).setOrigin(0.5);
-      this.add.text(this.ox + this.playW / 2, this.oy + this.playH / 2 + 30, "R para reiniciar", { fontSize: "16px", color: "#bbb" }).setOrigin(0.5);
+      g.fillStyle(0x000000, 0.5);
+      g.fillRect(this.ox, this.oy, this.playW, this.playH);
+      const over = this.add.text(this.ox + this.playW / 2, this.oy + this.playH / 2 - 8, "GAME OVER", { fontSize: "34px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } }).setOrigin(0.5);
+      const hint = this.add.text(this.ox + this.playW / 2, this.oy + this.playH / 2 + 34, "R para reiniciar", { fontSize: "15px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0.5);
+      this.overlay.add(over);
+      this.overlay.add(hint);
     }
   }
 }
@@ -172,7 +213,7 @@ export const createSpaceInvadersGame: PhaserGameFactory = (parent) => {
     parent,
     width: 700,
     height: 700,
-    backgroundColor: "#050510",
+    backgroundColor: HEX.bg,
     scene: [SpaceInvadersScene],
     scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
   });

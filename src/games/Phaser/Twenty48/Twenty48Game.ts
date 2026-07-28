@@ -1,12 +1,10 @@
 import Phaser from "phaser";
 import type { PhaserGameFactory } from "../shared/types";
+import { PALETTE, HEX, FONTS } from "../shared/theme";
 
 const SIZE = 4;
-const TILE_COLORS: Record<number, number> = {
-  0: 0xcdc1b4, 2: 0xeee4da, 4: 0xede0c8, 8: 0xf2b179,
-  16: 0xf59563, 32: 0xf67c5f, 64: 0xf65e3b, 128: 0xedcf72,
-  256: 0xedcc61, 512: 0xedc850, 1024: 0xedc53f, 2048: 0xedc22e,
-};
+// Dark late palette tile colors; actual colors computed in darkTileColor().
+const TILE_COLORS: Record<number, number> = {};
 
 class Twenty48Scene extends Phaser.Scene {
   private grid: number[][] = [];
@@ -15,19 +13,19 @@ class Twenty48Scene extends Phaser.Scene {
   private won = false;
   private graphics!: Phaser.GameObjects.Graphics;
   private scoreText!: Phaser.GameObjects.Text;
+  private overlay!: Phaser.GameObjects.Container;
   private tileSize = 80;
   private gap = 10;
   private ox = 0;
   private oy = 0;
 
-  constructor() {
-    super("Twenty48");
-  }
+  constructor() { super("Twenty48"); }
 
   create() {
     this.graphics = this.add.graphics();
-    this.scoreText = this.add.text(10, 10, "Score: 0", { fontSize: "20px", color: "#776e65" });
-    this.add.text(10, 38, "Flechas/WASD: mover · R: reiniciar", { fontSize: "12px", color: "#776e65" });
+    this.add.text(20, 12, "SCORE", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
+    this.scoreText = this.add.text(20, 24, "0", { fontSize: "26px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } });
+    this.overlay = this.add.container(0, 0);
     this.input.keyboard?.on("keydown", this.handleKey, this);
     this.scale.on("resize", () => this.draw(), this);
     this.reset();
@@ -84,54 +82,34 @@ class Twenty48Scene extends Phaser.Scene {
     if (dx !== 0) {
       for (let y = 0; y < SIZE; y++) {
         const line: number[] = [];
-        if (dx > 0) {
-          for (let x = SIZE - 1; x >= 0; x--) line.push(this.grid[y][x]);
-        } else {
-          for (let x = 0; x < SIZE; x++) line.push(this.grid[y][x]);
-        }
+        if (dx > 0) for (let x = SIZE - 1; x >= 0; x--) line.push(this.grid[y][x]);
+        else for (let x = 0; x < SIZE; x++) line.push(this.grid[y][x]);
         const r = this.slideLine(line);
         gain += r.gain;
-        if (dx > 0) {
-          for (let x = 0; x < SIZE; x++) {
-            const nv = r.out[SIZE - 1 - x];
-            if (this.grid[y][x] !== nv) moved = true;
-            this.grid[y][x] = nv;
-          }
-        } else {
-          for (let x = 0; x < SIZE; x++) {
-            const nv = r.out[x];
-            if (this.grid[y][x] !== nv) moved = true;
-            this.grid[y][x] = nv;
-          }
-        }
+        if (dx > 0) for (let x = 0; x < SIZE; x++) { const nv = r.out[SIZE - 1 - x]; if (this.grid[y][x] !== nv) moved = true; this.grid[y][x] = nv; }
+        else for (let x = 0; x < SIZE; x++) { const nv = r.out[x]; if (this.grid[y][x] !== nv) moved = true; this.grid[y][x] = nv; }
       }
     } else {
       for (let x = 0; x < SIZE; x++) {
         const line: number[] = [];
-        if (dy > 0) {
-          for (let y = SIZE - 1; y >= 0; y--) line.push(this.grid[y][x]);
-        } else {
-          for (let y = 0; y < SIZE; y++) line.push(this.grid[y][x]);
-        }
+        if (dy > 0) for (let y = SIZE - 1; y >= 0; y--) line.push(this.grid[y][x]);
+        else for (let y = 0; y < SIZE; y++) line.push(this.grid[y][x]);
         const r = this.slideLine(line);
         gain += r.gain;
-        if (dy > 0) {
-          for (let y = 0; y < SIZE; y++) {
-            const nv = r.out[SIZE - 1 - y];
-            if (this.grid[y][x] !== nv) moved = true;
-            this.grid[y][x] = nv;
-          }
-        } else {
-          for (let y = 0; y < SIZE; y++) {
-            const nv = r.out[y];
-            if (this.grid[y][x] !== nv) moved = true;
-            this.grid[y][x] = nv;
-          }
-        }
+        if (dy > 0) for (let y = 0; y < SIZE; y++) { const nv = r.out[SIZE - 1 - y]; if (this.grid[y][x] !== nv) moved = true; this.grid[y][x] = nv; }
+        else for (let y = 0; y < SIZE; y++) { const nv = r.out[y]; if (this.grid[y][x] !== nv) moved = true; this.grid[y][x] = nv; }
       }
     }
     this.score += gain;
     return moved;
+  }
+
+  private darkTileColor(v: number): number {
+    const colors: Record<number, number> = {
+      2: 0x1e213a, 4: 0x25294a, 8: 0x312e81, 16: 0x3730a3, 32: 0x4338ca,
+      64: 0x4f46e5, 128: 0x06b6d4, 256: 0x0891b2, 512: 0x0e7490, 1024: 0x6366f1, 2048: 0x8b5cf6,
+    };
+    return colors[v] ?? PALETTE.surfaceLight;
   }
 
   private canMove(): boolean {
@@ -146,10 +124,7 @@ class Twenty48Scene extends Phaser.Scene {
   }
 
   private handleKey(e: KeyboardEvent) {
-    if (e.code === "KeyR") {
-      this.scene.restart();
-      return;
-    }
+    if (e.code === "KeyR") { this.scene.restart(); return; }
     if (this.gameOver) return;
     let moved = false;
     switch (e.code) {
@@ -162,7 +137,7 @@ class Twenty48Scene extends Phaser.Scene {
       this.spawn();
       if (!this.won && this.grid.flat().includes(2048)) this.won = true;
       if (!this.canMove()) this.gameOver = true;
-      this.scoreText.setText(`Score: ${this.score}`);
+      this.scoreText.setText(String(this.score));
       this.draw();
     }
   }
@@ -170,6 +145,7 @@ class Twenty48Scene extends Phaser.Scene {
   private draw() {
     const g = this.graphics;
     g.clear();
+    this.overlay.removeAll(true);
     const w = this.scale.width;
     const h = this.scale.height;
     const maxBoard = Math.min(w, h - 80) - 40;
@@ -177,30 +153,58 @@ class Twenty48Scene extends Phaser.Scene {
     this.gap = Math.max(6, this.tileSize * 0.12);
     const boardSize = SIZE * this.tileSize + (SIZE + 1) * this.gap;
     this.ox = Math.floor((w - boardSize) / 2);
-    this.oy = 70;
+    this.oy = Math.max(70, Math.floor((h - boardSize) / 2));
 
-    g.fillStyle(0xfaf8ef, 1);
+    g.fillStyle(PALETTE.bg, 1);
     g.fillRect(0, 0, w, h);
-    g.fillStyle(0xbbada0, 1);
-    g.fillRect(this.ox, this.oy, boardSize, boardSize);
+    g.fillStyle(PALETTE.surface, 1);
+    g.fillRoundedRect(this.ox, this.oy, boardSize, boardSize, 12);
+    g.lineStyle(2, PALETTE.accent, 0.5);
+    g.strokeRoundedRect(this.ox, this.oy, boardSize, boardSize, 12);
 
     for (let y = 0; y < SIZE; y++) {
       for (let x = 0; x < SIZE; x++) {
         const v = this.grid[y][x];
         const px = this.ox + this.gap + x * (this.tileSize + this.gap);
         const py = this.oy + this.gap + y * (this.tileSize + this.gap);
-        g.fillStyle(TILE_COLORS[v] ?? 0x3c3a32, 1);
-        g.fillRect(px, py, this.tileSize, this.tileSize);
+        const tileColor = this.darkTileColor(v);
+        g.fillStyle(tileColor, 1);
+        g.fillRoundedRect(px, py, this.tileSize, this.tileSize, 8);
+        g.lineStyle(1, v >= 128 ? PALETTE.cyan : PALETTE.border, v >= 128 ? 0.6 : 0.4);
+        g.strokeRoundedRect(px, py, this.tileSize, this.tileSize, 8);
+        if (v >= 8) {
+          g.fillStyle(PALETTE.cyan, 0.12);
+          g.fillRoundedRect(px + 4, py + 4, this.tileSize - 8, this.tileSize - 8, 6);
+        }
         if (v > 0) {
           const fontSize = Math.max(12, this.tileSize * 0.4);
           const color = v <= 4 ? "#776e65" : "#fff";
-          this.add.text(px + this.tileSize / 2, py + this.tileSize / 2, String(v), {
-            fontSize: `${fontSize}px`,
-            color,
-            fontStyle: "bold",
+          const txt = this.add.text(px + this.tileSize / 2, py + this.tileSize / 2, String(v), {
+            fontSize: `${fontSize}px`, color: v <= 4 ? "#94a3b8" : "#e2e8f0", fontStyle: v >= 8 ? "italic" : "bold", fontFamily: v >= 8 ? FONTS.dseg.fontFamily : FONTS.ui.fontFamily,
+            shadow: v >= 8 ? { offsetX: 0, offsetY: 0, blur: 8, color: HEX.cyan, fill: true } : undefined,
           }).setOrigin(0.5);
+          this.overlay.add(txt);
         }
       }
+    }
+
+    if (this.gameOver) {
+    // instructions at bottom
+    this.add.text(20, h - 26, "Flechas/WASD: mover · R: reiniciar", { fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
+
+    g.fillStyle(0x000000, 0.5);
+    g.fillRoundedRect(this.ox, this.oy, boardSize, boardSize, 12);
+    const cx = this.ox + boardSize / 2;
+    const cy = this.oy + boardSize / 2;
+      const over = this.add.text(cx, cy - 8, "GAME OVER", { fontSize: "34px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } }).setOrigin(0.5);
+      const hint = this.add.text(cx, cy + 34, "R para reiniciar", { fontSize: "15px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0.5);
+      this.overlay.add(over);
+      this.overlay.add(hint);
+    } else if (this.won) {
+      const cx = this.ox + boardSize / 2;
+      const cy = this.oy + boardSize / 2;
+      const over = this.add.text(cx, cy, "¡2048!", { fontSize: "40px", color: HEX.accentSoft, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } }).setOrigin(0.5);
+      this.overlay.add(over);
     }
   }
 }
@@ -211,7 +215,7 @@ export const createTwenty48Game: PhaserGameFactory = (parent) => {
     parent,
     width: 500,
     height: 600,
-    backgroundColor: "#faf8ef",
+    backgroundColor: HEX.bg,
     scene: [Twenty48Scene],
     scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
   });

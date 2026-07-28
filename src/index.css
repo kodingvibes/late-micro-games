@@ -1,3 +1,19 @@
+@font-face {
+  font-family: 'DSEG14 Classic';
+  src: url('/fonts/dseg14-classic-bold-italic.woff2') format('woff2');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DSEG14 Classic Mini';
+  src: url('/fonts/dseg14-classic-mini-bold-italic.woff2') format('woff2');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 @import "tailwindcss";
 @import "@late/theme/tokens.css";
 @import "@late/theme/animations.css";

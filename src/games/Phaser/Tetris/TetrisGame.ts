@@ -1,19 +1,20 @@
 import Phaser from "phaser";
 import type { PhaserGameFactory } from "../shared/types";
+import { PALETTE, HEX, FONTS } from "../shared/theme";
 
 const COLS = 10;
 const ROWS = 20;
 const CELL = 28;
 const SHAPES: number[][][] = [
-  [[1, 1], [1, 1]],                          // O
-  [[0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0]], // I
-  [[0, 1, 0], [1, 1, 1], [0, 0, 0]],         // T
-  [[0, 0, 1], [1, 1, 1], [0, 0, 0]],         // L
-  [[1, 0, 0], [1, 1, 1], [0, 0, 0]],         // J
-  [[0, 1, 1], [1, 1, 0], [0, 0, 0]],         // S
-  [[1, 1, 0], [0, 1, 1], [0, 0, 0]],         // Z
+  [[1, 1], [1, 1]],
+  [[0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0]],
+  [[0, 1, 0], [1, 1, 1], [0, 0, 0]],
+  [[0, 0, 1], [1, 1, 1], [0, 0, 0]],
+  [[1, 0, 0], [1, 1, 1], [0, 0, 0]],
+  [[0, 1, 1], [1, 1, 0], [0, 0, 0]],
+  [[1, 1, 0], [0, 1, 1], [0, 0, 0]],
 ];
-const COLORS = [0xf5d000, 0x00e0e0, 0xa000f0, 0xf0a000, 0x0060e0, 0x00e000, 0xe02020];
+const COLORS = [PALETTE.yellow, PALETTE.cyan, PALETTE.violet, PALETTE.orange, PALETTE.accent, PALETTE.green, PALETTE.red];
 
 class TetrisScene extends Phaser.Scene {
   private board: number[][] = [];
@@ -26,21 +27,30 @@ class TetrisScene extends Phaser.Scene {
   private dropDelay = 0.6;
   private graphics!: Phaser.GameObjects.Graphics;
   private scoreText!: Phaser.GameObjects.Text;
+  private linesText!: Phaser.GameObjects.Text;
   private statusText!: Phaser.GameObjects.Text;
+  private overlay!: Phaser.GameObjects.Container;
 
-  constructor() {
-    super("Tetris");
-  }
+  constructor() { super("Tetris"); }
 
   create() {
-    const w = this.scale.width;
-    const h = this.scale.height;
     this.board = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
-
     this.graphics = this.add.graphics();
-    this.scoreText = this.add.text(10, 10, "Score: 0   Lines: 0", { fontSize: "18px", color: "#fff" });
-    this.add.text(10, 34, "Flechas: mover · ↑/X: rotar · ↓: bajar · Espacio: caída · P: pausa · R: reiniciar", { fontSize: "12px", color: "#aaa" });
-    this.statusText = this.add.text(w - 10, 10, "", { fontSize: "16px", color: "#ff0" }).setOrigin(1, 0);
+
+    this.add.text(20, 12, "SCORE", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0, 0);
+    this.scoreText = this.add.text(20, 26, "0", {
+      fontSize: "24px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic",
+      shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true },
+    }).setOrigin(0, 0);
+    this.add.text(140, 12, "LINES", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0, 0);
+    this.linesText = this.add.text(140, 26, "0", {
+      fontSize: "24px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic",
+      shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true },
+    }).setOrigin(0, 0);
+    this.statusText = this.add.text(this.scale.width - 20, 14, "", {
+      fontSize: "18px", color: HEX.accentSoft, fontFamily: FONTS.ui.fontFamily, fontStyle: "bold",
+    }).setOrigin(1, 0);
+    this.overlay = this.add.container(0, 0);
 
     this.spawnPiece();
     this.input.keyboard?.on("keydown", this.handleKey, this);
@@ -51,9 +61,7 @@ class TetrisScene extends Phaser.Scene {
   private spawnPiece() {
     const i = Phaser.Math.Between(0, SHAPES.length - 1);
     this.current = { shape: SHAPES[i], color: COLORS[i], x: Math.floor(COLS / 2) - 2, y: 0 };
-    if (!this.valid(this.current.shape, this.current.x, this.current.y)) {
-      this.gameOver = true;
-    }
+    if (!this.valid(this.current.shape, this.current.x, this.current.y)) this.gameOver = true;
   }
 
   private valid(shape: number[][], ox: number, oy: number): boolean {
@@ -94,7 +102,8 @@ class TetrisScene extends Phaser.Scene {
       this.lines += cleared;
       this.score += cleared * 100 * cleared;
       this.dropDelay = Math.max(0.1, 0.6 - this.lines * 0.02);
-      this.scoreText.setText(`Score: ${this.score}   Lines: ${this.lines}`);
+      this.scoreText.setText(String(this.score));
+      this.linesText.setText(String(this.lines));
     }
   }
 
@@ -116,10 +125,7 @@ class TetrisScene extends Phaser.Scene {
   }
 
   private handleKey(e: KeyboardEvent) {
-    if (e.code === "KeyR") {
-      this.scene.restart();
-      return;
-    }
+    if (e.code === "KeyR") { this.scene.restart(); return; }
     if (this.gameOver) return;
     if (e.code === "KeyP") {
       this.paused = !this.paused;
@@ -128,31 +134,14 @@ class TetrisScene extends Phaser.Scene {
     }
     if (this.paused) return;
     switch (e.code) {
-      case "ArrowLeft":
-        if (this.valid(this.current.shape, this.current.x - 1, this.current.y)) this.current.x--;
-        break;
-      case "ArrowRight":
-        if (this.valid(this.current.shape, this.current.x + 1, this.current.y)) this.current.x++;
-        break;
-      case "ArrowUp":
-      case "KeyX":
-        this.rotate();
-        break;
-      case "ArrowDown":
-        if (this.valid(this.current.shape, this.current.x, this.current.y + 1)) {
-          this.current.y++;
-          this.score += 1;
-        }
-        break;
-      case "Space":
-        while (this.valid(this.current.shape, this.current.x, this.current.y + 1)) {
-          this.current.y++;
-          this.score += 2;
-        }
-        this.lock();
-        break;
+      case "ArrowLeft": if (this.valid(this.current.shape, this.current.x - 1, this.current.y)) this.current.x--; break;
+      case "ArrowRight": if (this.valid(this.current.shape, this.current.x + 1, this.current.y)) this.current.x++; break;
+      case "ArrowUp": case "KeyX": this.rotate(); break;
+      case "ArrowDown": if (this.valid(this.current.shape, this.current.x, this.current.y + 1)) { this.current.y++; this.score += 1; } break;
+      case "Space": while (this.valid(this.current.shape, this.current.x, this.current.y + 1)) { this.current.y++; this.score += 2; } this.lock(); break;
     }
-    this.scoreText.setText(`Score: ${this.score}   Lines: ${this.lines}`);
+    this.scoreText.setText(String(this.score));
+    this.linesText.setText(String(this.lines));
     this.draw();
   }
 
@@ -161,11 +150,8 @@ class TetrisScene extends Phaser.Scene {
     this.dropTimer += delta / 1000;
     if (this.dropTimer >= this.dropDelay) {
       this.dropTimer = 0;
-      if (this.valid(this.current.shape, this.current.x, this.current.y + 1)) {
-        this.current.y++;
-      } else {
-        this.lock();
-      }
+      if (this.valid(this.current.shape, this.current.x, this.current.y + 1)) this.current.y++;
+      else this.lock();
       this.draw();
     }
   }
@@ -173,40 +159,89 @@ class TetrisScene extends Phaser.Scene {
   private draw() {
     const g = this.graphics;
     g.clear();
+    this.overlay.removeAll(true);
     const w = this.scale.width;
     const h = this.scale.height;
     const boardW = COLS * CELL;
     const boardH = ROWS * CELL;
     const ox = Math.floor((w - boardW) / 2);
-    const oy = Math.max(60, Math.floor((h - boardH) / 2));
+    const oy = Math.max(70, Math.floor((h - boardH) / 2));
 
-    g.fillStyle(0x000000, 1);
+    g.fillStyle(PALETTE.surface, 1);
     g.fillRect(ox, oy, boardW, boardH);
 
+    // grid
+    g.lineStyle(1, PALETTE.border, 1);
+    for (let x = 0; x <= COLS; x++) g.lineBetween(ox + x * CELL, oy, ox + x * CELL, oy + boardH);
+    for (let y = 0; y <= ROWS; y++) g.lineBetween(ox, oy + y * CELL, ox + boardW, oy + y * CELL);
+
+    // locked cells
     for (let y = 0; y < ROWS; y++) {
       for (let x = 0; x < COLS; x++) {
-        if (this.board[y][x] !== -1) {
-          g.fillStyle(this.board[y][x], 1);
-          g.fillRect(ox + x * CELL + 1, oy + y * CELL + 1, CELL - 2, CELL - 2);
-        }
+        if (this.board[y][x] !== -1) this.drawCell(g, ox, oy, x, y, this.board[y][x]);
       }
     }
+    // current piece
     if (this.current && !this.gameOver) {
-      g.fillStyle(this.current.color, 1);
       for (let y = 0; y < this.current.shape.length; y++) {
         for (let x = 0; x < this.current.shape[y].length; x++) {
           if (!this.current.shape[y][x]) continue;
-          g.fillRect(ox + (this.current.x + x) * CELL + 1, oy + (this.current.y + y) * CELL + 1, CELL - 2, CELL - 2);
+          this.drawCell(g, ox, oy, this.current.x + x, this.current.y + y, this.current.color);
         }
       }
     }
+
+    // next box
+    // next box
+    const nextSize = CELL * 5;
+    const nextX = ox + boardW + 24;
+    const nextY = oy + 24;
+    g.fillStyle(PALETTE.surface, 1);
+    g.fillRoundedRect(nextX, nextY, nextSize, nextSize, 10);
+    g.lineStyle(1, PALETTE.border, 1);
+    g.strokeRoundedRect(nextX, nextY, nextSize, nextSize, 10);
+    const nextText = this.add.text(nextX + nextSize / 2, nextY - 14, "PRÓXIMA", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0.5, 1);
+    this.overlay.add(nextText);
+
+    // render next piece centered in box
+    const nextPiece = this.current ? this.current.shape : SHAPES[0];
+    const pcw = nextPiece[0].length * CELL;
+    const pch = nextPiece.length * CELL;
+    const pcx = nextX + (nextSize - pcw) / 2;
+    const pcy = nextY + (nextSize - pch) / 2;
+    for (let y = 0; y < nextPiece.length; y++) {
+      for (let x = 0; x < nextPiece[y].length; x++) {
+        if (!nextPiece[y][x]) continue;
+        this.drawCell(g, pcx, pcy, x, y, this.current?.color ?? PALETTE.cyan);
+      }
+    }
+
+    // instructions at bottom
+    this.add.text(20, h - 26, "Flechas: mover · ↑/X: rotar · ↓: bajar · Espacio: caída · P: pausa · R: reiniciar", {
+      fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily,
+    }).setOrigin(0, 0);
 
     if (this.gameOver) {
       const cx = ox + boardW / 2;
       const cy = oy + boardH / 2;
-      this.add.text(cx, cy - 10, "GAME OVER", { fontSize: "32px", color: "#fff" }).setOrigin(0.5);
-      this.add.text(cx, cy + 30, "R para reiniciar", { fontSize: "16px", color: "#bbb" }).setOrigin(0.5);
+      g.fillStyle(0x000000, 0.6);
+      g.fillRect(ox, oy, boardW, boardH);
+      const over = this.add.text(cx, cy - 8, "GAME OVER", { fontSize: "34px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } }).setOrigin(0.5);
+      const hint = this.add.text(cx, cy + 30, "R para reiniciar", { fontSize: "15px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0.5);
+      this.overlay.add(over);
+      this.overlay.add(hint);
     }
+  }
+
+  private drawCell(g: Phaser.GameObjects.Graphics, ox: number, oy: number, x: number, y: number, color: number) {
+    const px = ox + x * CELL + 1;
+    const py = oy + y * CELL + 1;
+    g.fillStyle(color, 0.35);
+    g.fillRoundedRect(px - 4, py - 4, CELL + 8, CELL + 8, 5);
+    g.fillStyle(color, 1);
+    g.fillRoundedRect(px, py, CELL - 2, CELL - 2, 4);
+    g.fillStyle(0xffffff, 0.25);
+    g.fillCircle(px + CELL * 0.25, py + CELL * 0.25, 3);
   }
 }
 
@@ -214,9 +249,9 @@ export const createTetrisGame: PhaserGameFactory = (parent) => {
   return new Phaser.Game({
     type: Phaser.AUTO,
     parent,
-    width: 600,
-    height: 700,
-    backgroundColor: "#1a1a22",
+    width: 700,
+    height: 800,
+    backgroundColor: HEX.bg,
     scene: [TetrisScene],
     scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
   });

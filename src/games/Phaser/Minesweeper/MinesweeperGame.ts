@@ -1,21 +1,18 @@
 import Phaser from "phaser";
 import type { PhaserGameFactory } from "../shared/types";
+import { PALETTE, HEX, FONTS } from "../shared/theme";
 
 const COLS = 10;
 const ROWS = 10;
 const MINES = 15;
 
-interface Cell {
-  mine: boolean;
-  revealed: boolean;
-  flagged: boolean;
-  adjacent: number;
-}
+interface Cell { mine: boolean; revealed: boolean; flagged: boolean; adjacent: number; }
 
 class MinesweeperScene extends Phaser.Scene {
   private cells: Cell[][] = [];
   private graphics!: Phaser.GameObjects.Graphics;
   private statusText!: Phaser.GameObjects.Text;
+  private overlay!: Phaser.GameObjects.Container;
   private gameOver = false;
   private firstClick = true;
   private revealed = 0;
@@ -23,17 +20,16 @@ class MinesweeperScene extends Phaser.Scene {
   private ox = 0;
   private oy = 80;
 
-  constructor() {
-    super("Minesweeper");
-  }
+  constructor() { super("Minesweeper"); }
 
   create() {
     this.cells = Array.from({ length: ROWS }, () =>
       Array.from({ length: COLS }, () => ({ mine: false, revealed: false, flagged: false, adjacent: 0 }))
     );
     this.graphics = this.add.graphics();
-    this.statusText = this.add.text(10, 10, "Buscaminas — Minas: 15 · Banderas: 0", { fontSize: "18px", color: "#fff" });
-    this.add.text(10, 38, "Click izq: revelar · Click der: bandera · R: reiniciar", { fontSize: "12px", color: "#bbb" });
+    this.add.text(20, 12, "MINAS", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
+    this.statusText = this.add.text(20, 24, "15", { fontSize: "24px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } });
+    this.overlay = this.add.container(0, 0);
     this.input.keyboard?.on("keydown", (e: KeyboardEvent) => { if (e.code === "KeyR") this.scene.restart(); });
     this.input.on("pointerdown", this.handleClick, this);
     this.scale.on("resize", () => this.draw(), this);
@@ -44,11 +40,11 @@ class MinesweeperScene extends Phaser.Scene {
     const w = this.scale.width;
     const h = this.scale.height;
     const maxBoard = Math.min(w, h - 100) - 40;
-    this.cellSize = Math.max(20, maxBoard / Math.max(COLS, ROWS));
+    this.cellSize = Math.max(24, maxBoard / Math.max(COLS, ROWS));
     const boardW = this.cellSize * COLS;
     const boardH = this.cellSize * ROWS;
     this.ox = Math.floor((w - boardW) / 2);
-    this.oy = 80 + Math.floor((h - 80 - boardH) / 2);
+    this.oy = Math.max(70, 80 + Math.floor((h - 80 - boardH) / 2));
   }
 
   private placeMines(ex: number, ey: number) {
@@ -85,8 +81,8 @@ class MinesweeperScene extends Phaser.Scene {
     this.revealed++;
     if (c.mine) {
       this.gameOver = true;
-      this.statusText.setText("¡Boom! Perdiste 💥");
-      this.statusText.setColor("#f55");
+            this.statusText.setText("BOOM");
+            this.statusText.setColor(HEX.red);
       return;
     }
     if (c.adjacent === 0) {
@@ -121,11 +117,12 @@ class MinesweeperScene extends Phaser.Scene {
 
     if (this.revealed === COLS * ROWS - MINES) {
       this.gameOver = true;
-      this.statusText.setText("¡Ganaste! 🎉");
-      this.statusText.setColor("#5f5");
+      this.statusText.setText("WIN");
+      this.statusText.setColor(HEX.cyan);
     } else if (!this.gameOver) {
       const flagged = this.cells.flat().filter((c) => c.flagged).length;
-      this.statusText.setText(`Buscaminas — Minas: ${MINES} · Banderas: ${flagged}`);
+      this.statusText.setText(String(MINES - flagged));
+      this.statusText.setColor(HEX.cyan);
     }
     this.draw();
   }
@@ -134,40 +131,67 @@ class MinesweeperScene extends Phaser.Scene {
     this.layout();
     const g = this.graphics;
     g.clear();
+    this.overlay.removeAll(true);
     const w = this.scale.width;
-    g.fillStyle(0x2c3e50, 1);
-    g.fillRect(0, 0, w, this.scale.height);
+    const h = this.scale.height;
+    g.fillStyle(PALETTE.bg, 1);
+    g.fillRect(0, 0, w, h);
     const boardW = this.cellSize * COLS;
     const boardH = this.cellSize * ROWS;
-    g.fillStyle(0x34495e, 1);
-    g.fillRect(this.ox, this.oy, boardW, boardH);
 
-    const fs = Math.max(10, this.cellSize * 0.55);
-    const numColors = ["", "#3498db", "#27ae60", "#e74c3c", "#8e44ad", "#d35400", "#16a085", "#000", "#666"];
+    // instructions at bottom
+    this.add.text(20, h - 26, "Click izq: revelar · Click der: bandera · R: reiniciar", { fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
+
+    g.fillStyle(PALETTE.surface, 1);
+    g.fillRoundedRect(this.ox - 8, this.oy - 8, boardW + 16, boardH + 16, 14);
+
+    const fs = Math.max(14, this.cellSize * 0.55);
+    const numColors = ["", HEX.accentSoft, HEX.green, HEX.red, HEX.violet, HEX.orange, HEX.cyan, "#f8fafc", "#94a3b8"];
     for (let y = 0; y < ROWS; y++) {
       for (let x = 0; x < COLS; x++) {
         const c = this.cells[y][x];
         const px = this.ox + x * this.cellSize + 1;
         const py = this.oy + y * this.cellSize + 1;
         const sz = this.cellSize - 2;
+        const r = Math.max(3, sz * 0.15);
         if (c.revealed) {
-          g.fillStyle(c.mine ? 0xe74c3c : 0x7f8c8d, 1);
-          g.fillRect(px, py, sz, sz);
+          g.fillStyle(c.mine ? PALETTE.red : PALETTE.surfaceLight, 1);
+          g.fillRoundedRect(px, py, sz, sz, r);
           if (c.mine) {
-            this.add.text(px + sz / 2, py + sz / 2, "💣", { fontSize: `${fs}px` }).setOrigin(0.5);
+            this.addMine(px + sz / 2, py + sz / 2, sz * 0.4);
           } else if (c.adjacent > 0) {
-            this.add.text(px + sz / 2, py + sz / 2, String(c.adjacent), {
-              fontSize: `${fs}px`, color: numColors[c.adjacent], fontStyle: "bold",
+            const txt = this.add.text(px + sz / 2, py + sz / 2, String(c.adjacent), {
+              fontSize: `${fs}px`, color: numColors[c.adjacent], fontStyle: "italic", fontFamily: FONTS.dsegMini.fontFamily,
+              shadow: { offsetX: 0, offsetY: 0, blur: 8, color: numColors[c.adjacent], fill: true },
             }).setOrigin(0.5);
+            this.overlay.add(txt);
           }
         } else {
-          g.fillStyle(0x95a5a6, 1);
-          g.fillRect(px, py, sz, sz);
+          g.fillStyle(PALETTE.surfaceLight, 1);
+          g.fillRoundedRect(px, py, sz, sz, r);
+          g.lineStyle(1, PALETTE.border, 1);
+          g.strokeRoundedRect(px, py, sz, sz, r);
+          g.fillStyle(0xffffff, 0.06);
+          g.fillRoundedRect(px + 2, py + 2, Math.max(1, sz - 4), Math.max(1, sz * 0.35), Math.max(1, r - 1));
           if (c.flagged) {
-            this.add.text(px + sz / 2, py + sz / 2, "⚑", { fontSize: `${fs}px`, color: "#e74c3c" }).setOrigin(0.5);
+            const txt = this.add.text(px + sz / 2, py + sz / 2, "⚑", { fontSize: `${fs}px`, color: HEX.red }).setOrigin(0.5);
+            this.overlay.add(txt);
           }
         }
       }
+    }
+  }
+
+  private addMine(cx: number, cy: number, r: number) {
+    const g = this.graphics;
+    g.fillStyle(PALETTE.bg, 1);
+    g.fillCircle(cx, cy, r);
+    g.fillStyle(PALETTE.red, 1);
+    g.fillCircle(cx, cy, r * 0.45);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      g.lineStyle(2, PALETTE.red, 1);
+      g.lineBetween(cx, cy, cx + Math.cos(a) * r, cy + Math.sin(a) * r);
     }
   }
 }
@@ -178,7 +202,7 @@ export const createMinesweeperGame: PhaserGameFactory = (parent) => {
     parent,
     width: 500,
     height: 600,
-    backgroundColor: "#2c3e50",
+    backgroundColor: HEX.bg,
     scene: [MinesweeperScene],
     scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
   });

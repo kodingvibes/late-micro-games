@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import Phaser from "phaser";
 import "./bootstrap";
 import { getPhaserGame } from "./shared/types";
 
@@ -7,6 +6,15 @@ interface PhaserGameProps {
   gameId: string;
   title: string;
   onBack: () => void;
+}
+
+async function loadDsegFont() {
+  try {
+    await document.fonts.load("italic 700 20px 'DSEG14 Classic'");
+    await document.fonts.load("italic 700 20px 'DSEG14 Classic Mini'");
+  } catch (e) {
+    console.warn("[phaser] DSEG14 font preload failed", e);
+  }
 }
 
 export function PhaserPlayer({ gameId, title, onBack }: PhaserGameProps) {
@@ -22,49 +30,50 @@ export function PhaserPlayer({ gameId, title, onBack }: PhaserGameProps) {
       console.error(`Phaser game not found: ${gameId}`);
       return;
     }
+
+    let cancelled = false;
     container.innerHTML = "";
 
-    const game = meta.create(container);
-    gameRef.current = game;
+    void loadDsegFont().then(() => {
+      if (cancelled) return;
+      const game = meta.create(container);
+      gameRef.current = game;
 
-    const fit = () => {
-      const wrapper = wrapperRef.current;
-      if (!wrapper) return;
-      const rect = wrapper.getBoundingClientRect();
-      const w = Math.max(320, Math.floor(rect.width));
-      const h = Math.max(320, Math.floor(rect.height));
-      game.scale.setParentSize?.(w, h);
-      game.scale.refresh();
-    };
+      const fit = () => {
+        const container = containerRef.current;
+        if (!container || !game.scale) return;
+        const rect = container.getBoundingClientRect();
+        const w = Math.max(320, Math.floor(rect.width));
+        const h = Math.max(320, Math.floor(rect.height));
+        game.scale.setGameSize(w, h);
+      };
 
-    const ro = new ResizeObserver(fit);
-    if (wrapperRef.current) ro.observe(wrapperRef.current);
-    fit();
+      const ro = new ResizeObserver(fit);
+      if (containerRef.current) ro.observe(containerRef.current);
+      requestAnimationFrame(fit);
+    });
 
     return () => {
-      ro.disconnect();
+      cancelled = true;
       gameRef.current?.destroy(true);
       gameRef.current = null;
     };
   }, [gameId]);
 
   return (
-    <div className="h-screen flex flex-col bg-black">
-      <div className="flex items-center justify-between p-4 bg-mf-surface border-b border-slate-800 flex-shrink-0">
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#0b0d17]" ref={wrapperRef}>
+      <div className="flex items-center justify-between px-4 py-3 bg-[#0b0d17]/90 backdrop-blur border-b border-slate-800/60 flex-shrink-0">
         <button
           onClick={onBack}
-          className="px-3 py-1.5 rounded-md bg-slate-800 text-slate-200 text-sm hover:bg-slate-700 transition"
+          className="px-3 py-1.5 rounded-lg bg-slate-800/80 text-slate-200 text-sm hover:bg-slate-700 transition"
         >
           ← Volver
         </button>
-        <h2 className="text-slate-200 font-semibold">{title}</h2>
-        <div className="w-16" />
+        <h2 className="text-slate-100 font-semibold text-sm sm:text-base">{title}</h2>
+        <div className="w-20" />
       </div>
-      <div ref={wrapperRef} className="flex-1 min-h-0 relative">
-        <div
-          ref={containerRef}
-          className="absolute inset-0 w-full h-full flex items-center justify-center"
-        />
+      <div className="flex-1 min-h-0 relative p-4">
+        <div ref={containerRef} className="absolute inset-4 w-[calc(100%-32px)] h-[calc(100%-32px)] rounded-xl overflow-hidden border border-slate-800/60 bg-[#0b0d17] shadow-2xl" />
       </div>
     </div>
   );
