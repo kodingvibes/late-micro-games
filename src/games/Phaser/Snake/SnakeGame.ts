@@ -21,6 +21,9 @@ class SnakeScene extends Phaser.Scene {
   private cell = 20;
   private ox = 0;
   private oy = 0;
+  private instructionsText!: Phaser.GameObjects.Text;
+  private gameOverText!: Phaser.GameObjects.Text;
+  private restartHintText!: Phaser.GameObjects.Text;
 
   constructor() { super("Snake"); }
 
@@ -29,6 +32,11 @@ class SnakeScene extends Phaser.Scene {
     this.add.text(20, 12, "SCORE", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
     this.scoreText = this.add.text(20, 24, "0", { fontSize: "26px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } });
     this.overlay = this.add.container(0, 0);
+    this.instructionsText = this.add.text(20, 0, "Flechas/WASD: mover · P: pausa · R: reiniciar", { fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setVisible(false);
+    this.gameOverText = this.add.text(0, 0, "GAME OVER", { fontSize: "34px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } }).setOrigin(0.5).setVisible(false);
+    this.restartHintText = this.add.text(0, 0, "R para reiniciar", { fontSize: "15px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0.5).setVisible(false);
+    this.overlay.add(this.gameOverText);
+    this.overlay.add(this.restartHintText);
     this.input.keyboard?.on("keydown", this.handleKey, this);
     this.scale.on("resize", () => this.draw(), this);
     this.events.on('shutdown', () => {
@@ -119,7 +127,6 @@ class SnakeScene extends Phaser.Scene {
     this.layout();
     const g = this.graphics;
     g.clear();
-    this.overlay.removeAll(true);
     const w = this.scale.width;
     const h = this.scale.height;
     g.fillStyle(PALETTE.bg, 1);
@@ -128,7 +135,7 @@ class SnakeScene extends Phaser.Scene {
     const boardH = this.cell * GRID_H;
 
     // instructions at bottom
-    this.add.text(20, h - 26, "Flechas/WASD: mover · P: pausa · R: reiniciar", { fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
+    this.instructionsText.setPosition(20, h - 26).setVisible(true);
 
     g.fillStyle(PALETTE.surface, 1);
     g.fillRoundedRect(this.ox - 8, this.oy - 8, boardW + 16, boardH + 16, 14);
@@ -169,10 +176,11 @@ class SnakeScene extends Phaser.Scene {
     if (this.gameOver) {
       g.fillStyle(0x000000, 0.5);
       g.fillRect(this.ox, this.oy, boardW, boardH);
-      const over = this.add.text(this.ox + boardW / 2, this.oy + boardH / 2 - 8, "GAME OVER", { fontSize: "34px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } }).setOrigin(0.5);
-      const hint = this.add.text(this.ox + boardW / 2, this.oy + boardH / 2 + 34, "R para reiniciar", { fontSize: "15px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0.5);
-      this.overlay.add(over);
-      this.overlay.add(hint);
+      this.gameOverText.setPosition(this.ox + boardW / 2, this.oy + boardH / 2 - 8).setVisible(true);
+      this.restartHintText.setPosition(this.ox + boardW / 2, this.oy + boardH / 2 + 34).setVisible(true);
+    } else {
+      this.gameOverText.setVisible(false);
+      this.restartHintText.setVisible(false);
     }
   }
 }

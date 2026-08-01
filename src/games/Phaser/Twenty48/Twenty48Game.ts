@@ -16,6 +16,10 @@ class Twenty48Scene extends Phaser.Scene {
   private gap = 10;
   private ox = 0;
   private oy = 0;
+  private instructionsText!: Phaser.GameObjects.Text;
+  private gameOverText!: Phaser.GameObjects.Text;
+  private restartHintText!: Phaser.GameObjects.Text;
+  private winText!: Phaser.GameObjects.Text;
 
   constructor() { super("Twenty48"); }
 
@@ -24,6 +28,13 @@ class Twenty48Scene extends Phaser.Scene {
     this.add.text(20, 12, "SCORE", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
     this.scoreText = this.add.text(20, 24, "0", { fontSize: "26px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } });
     this.overlay = this.add.container(0, 0);
+    this.instructionsText = this.add.text(20, 0, "Flechas/WASD: mover · R: reiniciar", { fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setVisible(false);
+    this.gameOverText = this.add.text(0, 0, "GAME OVER", { fontSize: "34px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } }).setOrigin(0.5).setVisible(false);
+    this.restartHintText = this.add.text(0, 0, "R para reiniciar", { fontSize: "15px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0.5).setVisible(false);
+    this.winText = this.add.text(0, 0, "¡2048!", { fontSize: "40px", color: HEX.accentSoft, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } }).setOrigin(0.5).setVisible(false);
+    this.overlay.add(this.gameOverText);
+    this.overlay.add(this.restartHintText);
+    this.overlay.add(this.winText);
     this.input.keyboard?.on("keydown", this.handleKey, this);
     this.scale.on("resize", () => this.draw(), this);
     this.events.on('shutdown', () => {
@@ -191,22 +202,26 @@ class Twenty48Scene extends Phaser.Scene {
     }
 
     // instructions at bottom
-    this.add.text(20, h - 26, "Flechas/WASD: mover · R: reiniciar", { fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
+    this.instructionsText.setPosition(20, h - 26).setVisible(true);
 
     if (this.gameOver) {
     g.fillStyle(0x000000, 0.5);
     g.fillRoundedRect(this.ox, this.oy, boardSize, boardSize, 12);
     const cx = this.ox + boardSize / 2;
     const cy = this.oy + boardSize / 2;
-      const over = this.add.text(cx, cy - 8, "GAME OVER", { fontSize: "34px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } }).setOrigin(0.5);
-      const hint = this.add.text(cx, cy + 34, "R para reiniciar", { fontSize: "15px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0.5);
-      this.overlay.add(over);
-      this.overlay.add(hint);
+      this.gameOverText.setPosition(cx, cy - 8).setVisible(true);
+      this.restartHintText.setPosition(cx, cy + 34).setVisible(true);
+      this.winText.setVisible(false);
     } else if (this.won) {
       const cx = this.ox + boardSize / 2;
       const cy = this.oy + boardSize / 2;
-      const over = this.add.text(cx, cy, "¡2048!", { fontSize: "40px", color: HEX.accentSoft, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } }).setOrigin(0.5);
-      this.overlay.add(over);
+      this.winText.setPosition(cx, cy).setVisible(true);
+      this.gameOverText.setVisible(false);
+      this.restartHintText.setVisible(false);
+    } else {
+      this.gameOverText.setVisible(false);
+      this.restartHintText.setVisible(false);
+      this.winText.setVisible(false);
     }
   }
 }

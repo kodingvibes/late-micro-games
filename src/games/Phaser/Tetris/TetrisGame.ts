@@ -30,6 +30,10 @@ class TetrisScene extends Phaser.Scene {
   private linesText!: Phaser.GameObjects.Text;
   private statusText!: Phaser.GameObjects.Text;
   private overlay!: Phaser.GameObjects.Container;
+  private instructionsText!: Phaser.GameObjects.Text;
+  private gameOverText!: Phaser.GameObjects.Text;
+  private restartHintText!: Phaser.GameObjects.Text;
+  private nextLabelText!: Phaser.GameObjects.Text;
 
   constructor() { super("Tetris"); }
 
@@ -51,6 +55,14 @@ class TetrisScene extends Phaser.Scene {
       fontSize: "18px", color: HEX.accentSoft, fontFamily: FONTS.ui.fontFamily, fontStyle: "bold",
     }).setOrigin(1, 0);
     this.overlay = this.add.container(0, 0);
+    this.instructionsText = this.add.text(20, 0, "Flechas: mover · ↑/X: rotar · ↓: bajar · Espacio: caída · P: pausa · R: reiniciar", {
+      fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily,
+    }).setVisible(false);
+    this.gameOverText = this.add.text(0, 0, "GAME OVER", { fontSize: "34px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } }).setOrigin(0.5).setVisible(false);
+    this.restartHintText = this.add.text(0, 0, "R para reiniciar", { fontSize: "15px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0.5).setVisible(false);
+    this.nextLabelText = this.add.text(0, 0, "PRÓXIMA", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0.5, 1).setVisible(false);
+    this.overlay.add(this.gameOverText);
+    this.overlay.add(this.restartHintText);
 
     this.spawnPiece();
     this.input.keyboard?.on("keydown", this.handleKey, this);
@@ -196,7 +208,6 @@ class TetrisScene extends Phaser.Scene {
     }
 
     // next box
-    // next box
     const nextSize = CELL * 5;
     const nextX = ox + boardW + 24;
     const nextY = oy + 24;
@@ -204,8 +215,7 @@ class TetrisScene extends Phaser.Scene {
     g.fillRoundedRect(nextX, nextY, nextSize, nextSize, 10);
     g.lineStyle(1, PALETTE.border, 1);
     g.strokeRoundedRect(nextX, nextY, nextSize, nextSize, 10);
-    const nextText = this.add.text(nextX + nextSize / 2, nextY - 14, "PRÓXIMA", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0.5, 1);
-    this.overlay.add(nextText);
+    this.nextLabelText.setPosition(nextX + nextSize / 2, nextY - 14).setVisible(true);
 
     // render next piece centered in box
     const nextPiece = this.current ? this.current.shape : SHAPES[0];
@@ -221,19 +231,18 @@ class TetrisScene extends Phaser.Scene {
     }
 
     // instructions at bottom
-    this.add.text(20, h - 26, "Flechas: mover · ↑/X: rotar · ↓: bajar · Espacio: caída · P: pausa · R: reiniciar", {
-      fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily,
-    }).setOrigin(0, 0);
+    this.instructionsText.setPosition(20, h - 26).setVisible(true);
 
     if (this.gameOver) {
       const cx = ox + boardW / 2;
       const cy = oy + boardH / 2;
       g.fillStyle(0x000000, 0.6);
       g.fillRect(ox, oy, boardW, boardH);
-      const over = this.add.text(cx, cy - 8, "GAME OVER", { fontSize: "34px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } }).setOrigin(0.5);
-      const hint = this.add.text(cx, cy + 30, "R para reiniciar", { fontSize: "15px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0.5);
-      this.overlay.add(over);
-      this.overlay.add(hint);
+      this.gameOverText.setPosition(cx, cy - 8).setVisible(true);
+      this.restartHintText.setPosition(cx, cy + 30).setVisible(true);
+    } else {
+      this.gameOverText.setVisible(false);
+      this.restartHintText.setVisible(false);
     }
   }
 

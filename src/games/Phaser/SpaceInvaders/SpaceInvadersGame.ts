@@ -33,6 +33,9 @@ class SpaceInvadersScene extends Phaser.Scene {
   private keyRight!: Phaser.Input.Keyboard.Key;
   private keyA!: Phaser.Input.Keyboard.Key;
   private keyD!: Phaser.Input.Keyboard.Key;
+  private instructionsText!: Phaser.GameObjects.Text;
+  private gameOverText!: Phaser.GameObjects.Text;
+  private restartHintText!: Phaser.GameObjects.Text;
 
   constructor() { super("SpaceInvaders"); }
 
@@ -43,6 +46,11 @@ class SpaceInvadersScene extends Phaser.Scene {
     this.add.text(140, 12, "LIVES", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
     this.livesText = this.add.text(140, 24, "3", { fontSize: "24px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } });
     this.overlay = this.add.container(0, 0);
+    this.instructionsText = this.add.text(20, 0, "Flechas/A,D: mover · Espacio: disparar · P: pausa · R: reiniciar", { fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setVisible(false);
+    this.gameOverText = this.add.text(0, 0, "GAME OVER", { fontSize: "34px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } }).setOrigin(0.5).setVisible(false);
+    this.restartHintText = this.add.text(0, 0, "R para reiniciar", { fontSize: "15px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0.5).setVisible(false);
+    this.overlay.add(this.gameOverText);
+    this.overlay.add(this.restartHintText);
     this.keyLeft = this.input.keyboard!.addKey("LEFT");
     this.keyRight = this.input.keyboard!.addKey("RIGHT");
     this.keyA = this.input.keyboard!.addKey("A");
@@ -168,7 +176,7 @@ class SpaceInvadersScene extends Phaser.Scene {
     g.fillRect(0, 0, w, h);
 
     // instructions at bottom
-    this.add.text(20, h - 26, "Flechas/A,D: mover · Espacio: disparar · P: pausa · R: reiniciar", { fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
+    this.instructionsText.setPosition(20, h - 26).setVisible(true);
 
     g.fillStyle(PALETTE.surface, 1);
     g.fillRoundedRect(this.ox - 8, this.oy - 8, this.playW + 16, this.playH + 16, 14);
@@ -211,10 +219,11 @@ class SpaceInvadersScene extends Phaser.Scene {
     if (this.gameOver) {
       g.fillStyle(0x000000, 0.5);
       g.fillRect(this.ox, this.oy, this.playW, this.playH);
-      const over = this.add.text(this.ox + this.playW / 2, this.oy + this.playH / 2 - 8, "GAME OVER", { fontSize: "34px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } }).setOrigin(0.5);
-      const hint = this.add.text(this.ox + this.playW / 2, this.oy + this.playH / 2 + 34, "R para reiniciar", { fontSize: "15px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0.5);
-      this.overlay.add(over);
-      this.overlay.add(hint);
+      this.gameOverText.setPosition(this.ox + this.playW / 2, this.oy + this.playH / 2 - 8).setVisible(true);
+      this.restartHintText.setPosition(this.ox + this.playW / 2, this.oy + this.playH / 2 + 34).setVisible(true);
+    } else {
+      this.gameOverText.setVisible(false);
+      this.restartHintText.setVisible(false);
     }
   }
 }

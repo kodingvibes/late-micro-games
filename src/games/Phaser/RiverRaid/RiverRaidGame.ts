@@ -48,6 +48,11 @@ class RiverRaidScene extends Phaser.Scene {
   private keyRight!: Phaser.Input.Keyboard.Key;
   private keyA!: Phaser.Input.Keyboard.Key;
   private keyD!: Phaser.Input.Keyboard.Key;
+  private instructionsText!: Phaser.GameObjects.Text;
+  private gameOverText!: Phaser.GameObjects.Text;
+  private statsText!: Phaser.GameObjects.Text;
+  private restartHintText!: Phaser.GameObjects.Text;
+  private fuelLabelText!: Phaser.GameObjects.Text;
 
   constructor() { super("RiverRaid"); }
 
@@ -69,6 +74,15 @@ class RiverRaidScene extends Phaser.Scene {
       shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true },
     });
     this.overlay = this.add.container(0, 0);
+    this.instructionsText = this.add.text(20, 0, "Flechas/A,D: mover · Espacio: disparar · P: pausa · R: reiniciar", { fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setVisible(false);
+    this.gameOverText = this.add.text(0, 0, "GAME OVER", { fontSize: "38px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } }).setOrigin(0.5).setVisible(false);
+    this.statsText = this.add.text(0, 0, "", { fontSize: "16px", color: HEX.textMuted, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 8, color: HEX.cyan, fill: true } }).setOrigin(0.5).setVisible(false);
+    this.restartHintText = this.add.text(0, 0, "R para reiniciar", { fontSize: "15px", color: HEX.accentSoft, fontFamily: FONTS.ui.fontFamily }).setOrigin(0.5).setVisible(false);
+    this.fuelLabelText = this.add.text(0, 0, "FUEL", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0, 1).setVisible(false);
+    this.overlay.add(this.gameOverText);
+    this.overlay.add(this.statsText);
+    this.overlay.add(this.restartHintText);
+    this.overlay.add(this.fuelLabelText);
     this.keyLeft = this.input.keyboard!.addKey("LEFT");
     this.keyRight = this.input.keyboard!.addKey("RIGHT");
     this.keyA = this.input.keyboard!.addKey("A");
@@ -443,26 +457,23 @@ class RiverRaidScene extends Phaser.Scene {
     g.fillRoundedRect(fuelX, fuelY, fuelW * pct, fuelH, 4);
     g.lineStyle(1, PALETTE.border, 1);
     g.strokeRoundedRect(fuelX, fuelY, fuelW, fuelH, 4);
-    const fuelLabel = this.add.text(fuelX, fuelY - 8, "FUEL", {
-      fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily,
-    }).setOrigin(0, 1);
-    this.overlay.add(fuelLabel);
+    this.fuelLabelText.setPosition(fuelX, fuelY - 8).setVisible(true);
 
     // instructions at bottom (same margin everywhere)
-    const instructions = this.add.text(20, h - 26, "Flechas/A,D: mover · Espacio: disparar · P: pausa · R: reiniciar", { fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
-    this.overlay.add(instructions);
+    this.instructionsText.setPosition(20, h - 26).setVisible(true);
 
     if (this.gameOver) {
       g.fillStyle(0x000000, 0.6);
       g.fillRect(0, 0, w, h);
       const cx = w / 2;
       const cy = h / 2;
-      const over = this.add.text(cx, cy - 10, "GAME OVER", { fontSize: "38px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } }).setOrigin(0.5);
-      const stats = this.add.text(cx, cy + 34, `${this.score} · ${Math.floor(this.distance / 10)}m`, { fontSize: "16px", color: HEX.textMuted, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 8, color: HEX.cyan, fill: true } }).setOrigin(0.5);
-      const hint = this.add.text(cx, cy + 62, "R para reiniciar", { fontSize: "15px", color: HEX.accentSoft, fontFamily: FONTS.ui.fontFamily }).setOrigin(0.5);
-      this.overlay.add(over);
-      this.overlay.add(stats);
-      this.overlay.add(hint);
+      this.gameOverText.setPosition(cx, cy - 10).setVisible(true);
+      this.statsText.setText(`${this.score} · ${Math.floor(this.distance / 10)}m`).setPosition(cx, cy + 34).setVisible(true);
+      this.restartHintText.setPosition(cx, cy + 62).setVisible(true);
+    } else {
+      this.gameOverText.setVisible(false);
+      this.statsText.setVisible(false);
+      this.restartHintText.setVisible(false);
     }
   }
 }

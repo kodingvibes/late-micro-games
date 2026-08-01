@@ -19,6 +19,7 @@ class MinesweeperScene extends Phaser.Scene {
   private cellSize = 32;
   private ox = 0;
   private oy = 80;
+  private instructionsText!: Phaser.GameObjects.Text;
 
   constructor() { super("Minesweeper"); }
 
@@ -30,6 +31,7 @@ class MinesweeperScene extends Phaser.Scene {
     this.add.text(20, 12, "MINAS", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
     this.statusText = this.add.text(20, 24, "15", { fontSize: "24px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } });
     this.overlay = this.add.container(0, 0);
+    this.instructionsText = this.add.text(20, 0, "Click izq: revelar · Click der: bandera · R: reiniciar", { fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setVisible(false);
     this.input.keyboard?.on("keydown", this.handleKey, this);
     this.input.on("pointerdown", this.handleClick, this);
     this.scale.on("resize", () => this.draw(), this);
@@ -145,7 +147,7 @@ class MinesweeperScene extends Phaser.Scene {
     const boardH = this.cellSize * ROWS;
 
     // instructions at bottom
-    this.add.text(20, h - 26, "Click izq: revelar · Click der: bandera · R: reiniciar", { fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
+    this.instructionsText.setPosition(20, h - 26).setVisible(true);
 
     g.fillStyle(PALETTE.surface, 1);
     g.fillRoundedRect(this.ox - 8, this.oy - 8, boardW + 16, boardH + 16, 14);
