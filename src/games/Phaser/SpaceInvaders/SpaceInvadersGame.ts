@@ -1,6 +1,8 @@
 import Phaser from "phaser";
 import type { PhaserGameFactory } from "../shared/types";
 import { PALETTE, HEX, FONTS } from "../shared/theme";
+import { fadeInScene, screenShake, scorePop } from "../shared/effects";
+import { spawnExplosion, updateParticles, drawParticles } from "../shared/particles";
 
 const ROWS = 5;
 const COLS = 8;
@@ -60,6 +62,7 @@ class SpaceInvadersScene extends Phaser.Scene {
     this.scale.on("resize", this.draw, this);
     this.events.on('shutdown', this.onShutdown, this);
     this.reset();
+    fadeInScene(this, 300);
   }
 
   private onShutdown() {
@@ -135,6 +138,7 @@ class SpaceInvadersScene extends Phaser.Scene {
         if (edge) a.y += 20 * this.scale_;
         if (a.y + 20 * this.scale_ >= this.playH - 30 * this.scale_) {
           this.lives--;
+          screenShake(this, 0.004, 200);
           if (this.lives <= 0) this.gameOver = true;
           else { for (const b of this.aliens) if (b.alive) { const col = b.index % COLS; const row = Math.floor(b.index / COLS); b.x = 50 * this.scale_ + col * 50 * this.scale_; b.y = 40 * this.scale_ + row * 40 * this.scale_; } this.bullets = []; }
         }
@@ -153,6 +157,7 @@ class SpaceInvadersScene extends Phaser.Scene {
           this.score += 10;
           this.alienSpeed += 0.05;
           this.bullets.splice(i, 1);
+          scorePop(this, this.ox + b.x, this.oy + b.y, "+10", HEX.lime);
           break;
         }
       }

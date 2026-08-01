@@ -1,6 +1,8 @@
 import Phaser from "phaser";
 import type { PhaserGameFactory } from "../shared/types";
 import { PALETTE, HEX, FONTS } from "../shared/theme";
+import { fadeInScene, screenShake } from "../shared/effects";
+import { spawnExplosion, updateParticles, drawParticles } from "../shared/particles";
 
 const COLS = 10;
 const ROWS = 10;
@@ -20,6 +22,7 @@ class MinesweeperScene extends Phaser.Scene {
   private ox = 0;
   private oy = 80;
   private instructionsText!: Phaser.GameObjects.Text;
+  private _explosionParticles: any[] = [];
 
   constructor() { super("Minesweeper"); }
 
@@ -37,6 +40,7 @@ class MinesweeperScene extends Phaser.Scene {
     this.scale.on("resize", this.draw, this);
     this.events.on('shutdown', this.onShutdown, this);
     this.draw();
+    fadeInScene(this, 300);
   }
 
   private onShutdown() {
@@ -90,8 +94,12 @@ class MinesweeperScene extends Phaser.Scene {
     this.revealed++;
     if (c.mine) {
       this.gameOver = true;
-            this.statusText.setText("BOOM");
-            this.statusText.setColor(HEX.red);
+      this.statusText.setText("BOOM");
+      this.statusText.setColor(HEX.red);
+      screenShake(this, 0.008, 300);
+      const px = this.ox + x * this.cellSize + this.cellSize / 2;
+      const py = this.oy + y * this.cellSize + this.cellSize / 2;
+      this._explosionParticles = spawnExplosion(this, px, py, { count: 20, colors: [PALETTE.red, PALETTE.orange, PALETTE.yellow], speed: 120 });
       return;
     }
     if (c.adjacent === 0) {
@@ -189,10 +197,19 @@ class MinesweeperScene extends Phaser.Scene {
         }
       }
     }
+    // draw explosion particles
+    drawParticles(g, this._explosionParticles);
   }
 
   private handleKey(e: KeyboardEvent) {
     if (e.code === "KeyR") this.scene.restart();
+  }
+
+  override update(_t: number, delta: number) {
+    if (this._explosionParticles.length > 0) {
+      this._explosionParticles = updateParticles(this._explosionParticles, delta / 1000);
+      this.draw();
+    }
   }
 
   private addMine(cx: number, cy: number, r: number) {

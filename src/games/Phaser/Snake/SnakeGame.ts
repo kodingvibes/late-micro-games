@@ -1,6 +1,8 @@
 import Phaser from "phaser";
 import type { PhaserGameFactory } from "../shared/types";
 import { PALETTE, HEX, FONTS } from "../shared/theme";
+import { fadeInScene, screenShake, scorePop } from "../shared/effects";
+import { spawnExplosion, updateParticles, drawParticles } from "../shared/particles";
 
 const GRID_W = 25;
 const GRID_H = 25;
@@ -41,6 +43,7 @@ class SnakeScene extends Phaser.Scene {
     this.scale.on("resize", this.draw, this);
     this.events.on('shutdown', this.onShutdown, this);
     this.reset();
+    fadeInScene(this, 300);
   }
 
   private onShutdown() {
@@ -111,10 +114,16 @@ class SnakeScene extends Phaser.Scene {
     if (head.x === this.food.x && head.y === this.food.y) {
       this.score += 10;
       this.speed = Math.max(0.06, this.speed - 0.002);
+      const fx = this.ox + this.food.x * this.cell + this.cell / 2;
+      const fy = this.oy + this.food.y * this.cell + this.cell / 2;
       this.spawnFood();
       this.scoreText.setText(String(this.score));
+      scorePop(this, fx, fy, "+10", HEX.lime);
     } else {
       this.snake.pop();
+    }
+    if (this.gameOver) {
+      screenShake(this, 0.005, 250);
     }
   }
 

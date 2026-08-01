@@ -1,6 +1,9 @@
 import Phaser from "phaser";
 import type { PhaserGameFactory } from "../shared/types";
 import { PALETTE, HEX, FONTS } from "../shared/theme";
+import { fadeInScene, screenShake, scorePop } from "../shared/effects";
+import type { Particle } from "../shared/particles";
+import { spawnExplosion, updateParticles, drawParticles } from "../shared/particles";
 
 const RIVER_W_MIN = 180;
 const RIVER_W_MAX = 360;
@@ -40,7 +43,7 @@ class RiverRaidScene extends Phaser.Scene {
   private banks: BankPoint[] = [];
   private enemies: Enemy[] = [];
   private bullets: Bullet[] = [];
-  private particles: { x: number; y: number; vx: number; vy: number; life: number; color: number }[] = [];
+  private particles: Particle[] = [];
   private nextSpawnY = -200;
   private nextBridgeY = -1200;
   private tick = 0;
@@ -91,6 +94,7 @@ class RiverRaidScene extends Phaser.Scene {
     this.scale.on("resize", this.draw, this);
     this.events.on('shutdown', this.onShutdown, this);
     this.reset();
+    fadeInScene(this, 300);
   }
 
   private onShutdown() {
@@ -200,17 +204,13 @@ class RiverRaidScene extends Phaser.Scene {
   }
 
   private addExplosion(x: number, y: number, color = PALETTE.orange) {
-    for (let i = 0; i < 10; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const v = 30 + Math.random() * 70;
-      this.particles.push({
-        x, y,
-        vx: Math.cos(a) * v,
-        vy: Math.sin(a) * v,
-        life: 0.4 + Math.random() * 0.4,
-        color,
-      });
-    }
+    const newParts = spawnExplosion(this, x, y, {
+      count: 15,
+      colors: [color, PALETTE.yellow, PALETTE.red, PALETTE.orange],
+      speed: 90,
+    });
+    this.particles.push(...newParts);
+    screenShake(this, 0.004, 200);
   }
 
   override update(_t: number, delta: number) {
@@ -281,6 +281,7 @@ class RiverRaidScene extends Phaser.Scene {
           this.fuel = Math.min(100, this.fuel + 35);
           this.score += 50;
           e.alive = false;
+          scorePop(this, e.x, e.y, "+50", HEX.yellow);
         } else {
           this.lives--;
           e.alive = false;
@@ -298,9 +299,11 @@ class RiverRaidScene extends Phaser.Scene {
             e.alive = false;
             this.score += e.type === "fuel" ? 50 : 100;
             this.addExplosion(e.x, e.y, e.type === "fuel" ? PALETTE.yellow : PALETTE.orange);
+            scorePop(this, e.x, e.y, e.type === "fuel" ? "+50" : "+100", e.type === "fuel" ? HEX.yellow : HEX.orange);
           } else {
             this.score += 300;
             this.addExplosion(e.x, e.y, PALETTE.red);
+            scorePop(this, e.x, e.y, "+300", HEX.red);
             e.alive = false;
           }
           break;
@@ -310,13 +313,7 @@ class RiverRaidScene extends Phaser.Scene {
     this.enemies = this.enemies.filter((e) => e.y < h + 80);
 
     // particles
-    for (const p of this.particles) {
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.y += move * 0.4;
-      p.life -= dt;
-    }
-    this.particles = this.particles.filter((p) => p.life > 0);
+    this.particles = updateParticles(this.particles, dt, this.speed * 0.4);
 
     // fuel empty
     if (this.fuel <= 0) {
@@ -419,11 +416,7 @@ class RiverRaidScene extends Phaser.Scene {
     }
 
     // particles
-    for (const p of this.particles) {
-      const alpha = Phaser.Math.Clamp(p.life * 2, 0, 1);
-      g.fillStyle(p.color, alpha);
-      g.fillCircle(p.x, p.y, 3 + p.life * 4);
-    }
+    drawParticles(g, this.particles);
 
     // player jet
     const px = this.player.x;

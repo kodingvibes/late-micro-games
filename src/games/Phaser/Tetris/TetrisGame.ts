@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import type { PhaserGameFactory } from "../shared/types";
 import { PALETTE, HEX, FONTS } from "../shared/theme";
+import { fadeInScene, screenShake, scorePop } from "../shared/effects";
 
 const COLS = 10;
 const ROWS = 20;
@@ -69,6 +70,7 @@ class TetrisScene extends Phaser.Scene {
     this.scale.on("resize", this.draw, this);
     this.events.on('shutdown', this.onShutdown, this);
     this.draw();
+    fadeInScene(this, 300);
   }
 
   private onShutdown() {
@@ -122,6 +124,10 @@ class TetrisScene extends Phaser.Scene {
       this.dropDelay = Math.max(0.1, 0.6 - this.lines * 0.02);
       this.scoreText.setText(String(this.score));
       this.linesText.setText(String(this.lines));
+      screenShake(this, 0.003, 150);
+      const cx = Math.floor((this.scale.width - COLS * CELL) / 2) + (COLS * CELL) / 2;
+      const cy = Math.max(70, Math.floor((this.scale.height - ROWS * CELL) / 2)) + (ROWS * CELL) / 2;
+      scorePop(this, cx, cy, `+${cleared * 100 * cleared}`);
     }
   }
 

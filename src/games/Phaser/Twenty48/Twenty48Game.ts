@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import type { PhaserGameFactory } from "../shared/types";
 import { PALETTE, HEX, FONTS } from "../shared/theme";
+import { fadeInScene, scorePop } from "../shared/effects";
 
 const SIZE = 4;
 
@@ -39,6 +40,7 @@ class Twenty48Scene extends Phaser.Scene {
     this.scale.on("resize", this.draw, this);
     this.events.on('shutdown', this.onShutdown, this);
     this.reset();
+    fadeInScene(this, 300);
   }
 
   private onShutdown() {
