@@ -6,8 +6,10 @@ import type { Particle } from "../shared/particles";
 import { spawnExplosion, updateParticles, drawParticles } from "../shared/particles";
 import {
   GradientBackground, createStarField, updateStarField, drawStarField,
+  drawMountainRange, drawWaterWaves,
   drawSpriteBox, drawSpriteCircle, drawSpriteTriangle, drawPanel, drawProgressBar,
 } from "../shared/backgrounds";
+import { sfxShoot, sfxExplosion, sfxPickup, sfxGameOver, resumeAudio } from "../shared/sound";
 
 const RIVER_W_MIN = 180;
 const RIVER_W_MAX = 360;
@@ -39,6 +41,7 @@ class RiverRaidScene extends Phaser.Scene {
   private fuel = 100;
   private lives = 3;
   private gameOver = false;
+  private gameOverTimer = 0;
   private paused = false;
   private speed = 160;
   private riverW = 260;
@@ -64,6 +67,9 @@ class RiverRaidScene extends Phaser.Scene {
   private stars: { x: number; y: number; size: number; alpha: number; speed: number; }[] = [];
   private waterTime = 0;
   private engineParticles: { x: number; y: number; life: number; }[] = [];
+  private engineGlowPulse = 0;
+  private gameOverZoom = 0;
+  private gameOverParticles: Particle[] = [];
 
   constructor() { super("RiverRaid"); }
 
@@ -71,8 +77,8 @@ class RiverRaidScene extends Phaser.Scene {
     this.graphics = this.add.graphics();
     this.bg = new GradientBackground(this, {
       layers: [
-        { speed: 0.005, colors: [0x05070e, 0x0b0d17, 0x0f1220, 0x14162a], height: 0.5 },
-        { speed: 0.02, colors: [0x14162a, 0x1a1d35, 0x1e213a], height: 0.3, y: 0 },
+        { speed: 0.003, colors: [0x05070e, 0x0b0d17, 0x0f1220, 0x14162a], height: 0.5 },
+        { speed: 0.015, colors: [0x14162a, 0x1a1d35, 0x1e213a], height: 0.3, y: 0 },
       ],
       scanlines: true,
       vignette: true,
@@ -139,8 +145,12 @@ class RiverRaidScene extends Phaser.Scene {
     this.nextSpawnY = -200;
     this.nextBridgeY = -1200;
     this.gameOver = false;
+    this.gameOverTimer = 0;
+    this.gameOverZoom = 0;
+    this.gameOverParticles = [];
     this.paused = false;
     this.waterTime = 0;
+    this.engineGlowPulse = 0;
     this.generateBanks(0);
     this.draw();
   }
@@ -171,6 +181,8 @@ class RiverRaidScene extends Phaser.Scene {
     if (this.gameOver || this.paused) return;
     if (e.code === "KeyP") { this.paused = !this.paused; return; }
     if (e.code === "Space") {
+      resumeAudio();
+      sfxShoot();
       this.bullets.push({ x: this.player.x, y: this.player.y - 28, alive: true });
       this.bullets.push({ x: this.player.x - 10, y: this.player.y - 14, alive: true });
       this.bullets.push({ x: this.player.x + 10, y: this.player.y - 14, alive: true });
@@ -225,11 +237,20 @@ class RiverRaidScene extends Phaser.Scene {
       speed: 100,
     });
     this.particles.push(...newParts);
+    sfxExplosion();
     screenShake(this, 0.005, 250);
   }
 
   override update(_t: number, delta: number) {
-    if (this.gameOver || this.paused) return;
+    if (this.gameOver) {
+      this.gameOverTimer += delta / 1000;
+      this.gameOverZoom = Math.min(1, this.gameOverZoom + delta / 500);
+      this.particles = updateParticles(this.particles, delta / 1000);
+      this.gameOverParticles = updateParticles(this.gameOverParticles, delta / 1000);
+      this.draw();
+      return;
+    }
+    if (this.paused) return;
     const dt = delta / 1000;
     const w = this.scale.width;
     const h = this.scale.height;
@@ -239,6 +260,7 @@ class RiverRaidScene extends Phaser.Scene {
     this.fuel = Math.max(0, this.fuel - dt * 1.8);
     this.speed = Math.min(380, 160 + this.distance / 250);
     this.waterTime += dt;
+    this.engineGlowPulse += dt * 4;
 
     this.targetRiverW = RIVER_W_MIN + (RIVER_W_MAX - RIVER_W_MIN) * (0.6 + 0.4 * Math.sin(this.distance / 800));
     this.riverW += (this.targetRiverW - this.riverW) * dt * 0.5;
@@ -293,6 +315,7 @@ class RiverRaidScene extends Phaser.Scene {
           this.fuel = Math.min(100, this.fuel + 35);
           this.score += 50;
           e.alive = false;
+          sfxPickup();
           scorePop(this, e.x, e.y, "+50", HEX.yellow);
         } else {
           this.lives--;
@@ -332,6 +355,15 @@ class RiverRaidScene extends Phaser.Scene {
       if (this.lives <= 0) this.gameOver = true;
     }
 
+    if (this.gameOver) {
+      sfxGameOver();
+      this.gameOverTimer = 0;
+      this.gameOverZoom = 0;
+      this.gameOverParticles = spawnExplosion(this, this.player.x, this.player.y, {
+        count: 30, colors: [PALETTE.red, PALETTE.orange, PALETTE.yellow, PALETTE.cyan], speed: 150,
+      });
+    }
+
     this.draw();
   }
 
@@ -347,18 +379,13 @@ class RiverRaidScene extends Phaser.Scene {
     updateStarField(this.stars, 0.016, 5, w, h);
     drawStarField(g, this.stars);
 
-    // Mountains silhouette (parallax layer 2)
+    // Mountains silhouette (parallax layer 2 - medium)
     const mountOffset = (this.distance * 0.1) % 400;
-    g.fillStyle(0x0d0f1e, 0.6);
-    g.beginPath();
-    g.moveTo(0, h);
-    for (let x = 0; x <= w; x += 20) {
-      const mh = 60 + Math.sin((x + mountOffset) / 80) * 30 + Math.sin((x + mountOffset) / 40) * 15;
-      g.lineTo(x, h - mh);
-    }
-    g.lineTo(w, h);
-    g.closePath();
-    g.fillPath();
+    drawMountainRange(g, w, h, mountOffset, 0x0d0f1e, 0.6, 60, 80, 40, 15);
+
+    // Far mountains (parallax layer 1 - slow)
+    const farMountOffset = (this.distance * 0.05) % 300;
+    drawMountainRange(g, w, h, farMountOffset, 0x0a0c18, 0.4, 40, 120, 60, 10);
 
     // Water surface with wave texture
     if (this.banks.length > 1) {
@@ -378,14 +405,8 @@ class RiverRaidScene extends Phaser.Scene {
       g.closePath();
       g.fillPath();
 
-      // Water wave lines
-      g.lineStyle(1, PALETTE.cyan, 0.08);
-      for (let y = -SEGMENT_H; y < h + SEGMENT_H; y += 12) {
-        const cx = this.bankXAt(y);
-        const halfW = this.riverW / 2 - 10;
-        const waveX = Math.sin((y + this.waterTime * 60) / 30) * 8;
-        g.lineBetween(cx - halfW + waveX, y, cx + halfW + waveX, y);
-      }
+      // Animated water waves
+      drawWaterWaves(g, w, h, this.waterTime, PALETTE.cyan, 0.08, 12, 8);
 
       // Water surface shimmer
       g.fillStyle(0xffffff, 0.03);
@@ -500,11 +521,18 @@ class RiverRaidScene extends Phaser.Scene {
         // Cockpit
         g.fillStyle(PALETTE.cyan, 0.3);
         g.fillCircle(e.x, ey - 2, 5);
-        // Rotor blades
+        // Rotor blades (animated)
         const rotorAngle = this.waterTime * 20;
         g.lineStyle(2, PALETTE.surfaceLight, 0.8);
-        g.lineBetween(e.x - e.w * 0.7, ey - e.h / 2, e.x + e.w * 0.7, ey - e.h / 2);
-        g.lineBetween(e.x, ey - e.h / 2 - e.w * 0.3, e.x, ey - e.h / 2 + e.w * 0.3);
+        const rLen = e.w * 0.7;
+        g.lineBetween(
+          e.x - Math.cos(rotorAngle) * rLen, ey - e.h / 2 - Math.sin(rotorAngle) * rLen,
+          e.x + Math.cos(rotorAngle) * rLen, ey - e.h / 2 + Math.sin(rotorAngle) * rLen,
+        );
+        g.lineBetween(
+          e.x - Math.cos(rotorAngle + Math.PI / 2) * rLen * 0.5, ey - e.h / 2 - Math.sin(rotorAngle + Math.PI / 2) * rLen * 0.5,
+          e.x + Math.cos(rotorAngle + Math.PI / 2) * rLen * 0.5, ey - e.h / 2 + Math.sin(rotorAngle + Math.PI / 2) * rLen * 0.5,
+        );
         // Rotor blur
         g.fillStyle(0xffffff, 0.08);
         g.fillCircle(e.x, ey - e.h / 2, e.w * 0.5);
@@ -537,10 +565,11 @@ class RiverRaidScene extends Phaser.Scene {
     const px = this.player.x;
     const py = this.player.y;
 
-    // Engine glow
-    g.fillStyle(PALETTE.cyan, 0.1);
+    // Engine glow (pulsating)
+    const glowPulse = 0.08 + Math.sin(this.engineGlowPulse) * 0.04;
+    g.fillStyle(PALETTE.cyan, glowPulse);
     g.fillCircle(px, py + PLAYER_H / 2 + 8, 14);
-    g.fillStyle(PALETTE.cyan, 0.2);
+    g.fillStyle(PALETTE.cyan, glowPulse * 2);
     g.fillCircle(px, py + PLAYER_H / 2 + 6, 8);
 
     // Ship body
@@ -587,16 +616,30 @@ class RiverRaidScene extends Phaser.Scene {
 
     this.instructionsText.setPosition(20, h - 26).setVisible(true);
 
+    // Game over with zoom transition
     if (this.gameOver) {
-      g.fillStyle(0x000000, 0.7);
+      const zoom = this.gameOverZoom;
+      const alpha = Math.min(0.7, zoom * 0.7);
+
+      g.fillStyle(0x000000, alpha);
       g.fillRect(0, 0, w, h);
-      g.lineStyle(2, PALETTE.cyan, 0.2);
-      g.strokeRect(40, 40, w - 80, h - 80);
+
+      // Zooming border
+      const borderInset = 40 * (1 - zoom * 0.5);
+      g.lineStyle(2, PALETTE.cyan, 0.2 + zoom * 0.2);
+      g.strokeRect(borderInset, borderInset, w - borderInset * 2, h - borderInset * 2);
+
       const cx = w / 2;
       const cy = h / 2;
-      this.gameOverText.setPosition(cx, cy - 10).setVisible(true);
-      this.statsText.setText(`${this.score} · ${Math.floor(this.distance / 10)}m`).setPosition(cx, cy + 34).setVisible(true);
-      this.restartHintText.setPosition(cx, cy + 62).setVisible(true);
+
+      // Game over text scales in
+      const textScale = Math.min(1, zoom * 1.5);
+      this.gameOverText.setPosition(cx, cy - 10).setVisible(true).setScale(textScale);
+      this.statsText.setText(`${this.score} · ${Math.floor(this.distance / 10)}m`).setPosition(cx, cy + 34).setVisible(true).setAlpha(zoom);
+      this.restartHintText.setPosition(cx, cy + 62).setVisible(true).setAlpha(Math.max(0, zoom * 2 - 1));
+
+      // Game over particles
+      drawParticles(g, this.gameOverParticles);
     } else {
       this.gameOverText.setVisible(false);
       this.statsText.setVisible(false);

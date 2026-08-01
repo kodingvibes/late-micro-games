@@ -7,12 +7,13 @@ import {
   GradientBackground, createStarField, updateStarField, drawStarField,
   drawSpriteBox, drawSpriteCircle, drawSpriteTriangle, drawPanel,
 } from "../shared/backgrounds";
+import { sfxShoot, sfxExplosion, sfxHit, sfxGameOver, resumeAudio } from "../shared/sound";
 
 const ROWS = 5;
 const COLS = 8;
 
 interface Bullet { x: number; y: number; }
-interface Alien { x: number; y: number; alive: boolean; index: number; floatOff: number; }
+interface Alien { x: number; y: number; alive: boolean; index: number; floatOff: number; blinkTimer: number; }
 
 class SpaceInvadersScene extends Phaser.Scene {
   private playerX = 0;
@@ -25,6 +26,8 @@ class SpaceInvadersScene extends Phaser.Scene {
   private score = 0;
   private lives = 3;
   private gameOver = false;
+  private gameOverTimer = 0;
+  private gameOverFlash = 0;
   private paused = false;
   private graphics!: Phaser.GameObjects.Graphics;
   private scoreText!: Phaser.GameObjects.Text;
@@ -46,6 +49,9 @@ class SpaceInvadersScene extends Phaser.Scene {
   private stars: { x: number; y: number; size: number; alpha: number; speed: number; }[] = [];
   private engineParticles: { x: number; y: number; life: number; }[] = [];
   private alienFloatTimer = 0;
+  private engineGlowPulse = 0;
+  private bulletParticles: { x: number; y: number; life: number; color: number; }[] = [];
+  private gameOverParticles: { x: number; y: number; life: number; maxLife: number; color: number; size: number; vx: number; vy: number; }[] = [];
 
   constructor() { super("SpaceInvaders"); }
 
@@ -92,18 +98,23 @@ class SpaceInvadersScene extends Phaser.Scene {
     this.bullets = [];
     this.aliens = [];
     this.engineParticles = [];
+    this.bulletParticles = [];
+    this.gameOverParticles = [];
     this.score = 0;
     this.lives = 3;
     this.gameOver = false;
+    this.gameOverTimer = 0;
+    this.gameOverFlash = 0;
     this.paused = false;
     this.alienDir = 1;
     this.alienSpeed = 0.6;
     this.alienFloatTimer = 0;
+    this.engineGlowPulse = 0;
     this.layout();
     this.playerX = this.playW / 2 - this.playerW / 2;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
-        this.aliens.push({ x: 50 * this.scale_ + c * 50 * this.scale_, y: 40 * this.scale_ + r * 40 * this.scale_, alive: true, index: r * COLS + c, floatOff: Math.random() * Math.PI * 2 });
+        this.aliens.push({ x: 50 * this.scale_ + c * 50 * this.scale_, y: 40 * this.scale_ + r * 40 * this.scale_, alive: true, index: r * COLS + c, floatOff: Math.random() * Math.PI * 2, blinkTimer: 0 });
       }
     }
     this.scoreText.setText(String(this.score));
@@ -127,6 +138,8 @@ class SpaceInvadersScene extends Phaser.Scene {
     if (this.gameOver) return;
     if (e.code === "KeyP") { this.paused = !this.paused; return; }
     if (e.code === "Space") {
+      resumeAudio();
+      sfxShoot();
       this.bullets.push({ x: this.playerX + this.playerW / 2, y: this.playH - 30 * this.scale_ });
     }
   }
@@ -134,7 +147,21 @@ class SpaceInvadersScene extends Phaser.Scene {
   private aliveCount() { return this.aliens.filter((a) => a.alive).length; }
 
   override update(_t: number, delta: number) {
-    if (this.gameOver || this.paused) return;
+    if (this.gameOver) {
+      this.gameOverTimer += delta / 1000;
+      this.gameOverFlash += delta / 1000;
+      // Update game over particles
+      for (const p of this.gameOverParticles) {
+        p.x += p.vx * delta / 1000;
+        p.y += p.vy * delta / 1000;
+        p.vy += 60 * delta / 1000;
+        p.life -= delta / 1000;
+      }
+      this.gameOverParticles = this.gameOverParticles.filter((p) => p.life > 0);
+      this.draw();
+      return;
+    }
+    if (this.paused) return;
     const dt = delta / 1000;
     this.layout();
     const left = this.keyLeft.isDown || this.keyA.isDown;
@@ -143,10 +170,20 @@ class SpaceInvadersScene extends Phaser.Scene {
     if (right) this.playerX += 300 * this.scale_ * dt;
     this.playerX = Phaser.Math.Clamp(this.playerX, 0, this.playW - this.playerW);
 
+    // Engine glow pulse
+    this.engineGlowPulse += dt * 5;
+
     // Engine particles
     this.engineParticles.push({ x: this.playerX + this.playerW / 2, y: this.playH - 10 * this.scale_, life: 0.3 });
     for (const p of this.engineParticles) { p.life -= dt; p.y += 20 * dt; }
     this.engineParticles = this.engineParticles.filter((p) => p.life > 0);
+
+    // Bullet trail particles
+    for (const b of this.bullets) {
+      this.bulletParticles.push({ x: b.x, y: b.y + 5, life: 0.2, color: PALETTE.yellow });
+    }
+    for (const p of this.bulletParticles) { p.life -= dt; p.y += 10 * dt; }
+    this.bulletParticles = this.bulletParticles.filter((p) => p.life > 0);
 
     // Alien float animation
     this.alienFloatTimer += dt;
@@ -186,7 +223,18 @@ class SpaceInvadersScene extends Phaser.Scene {
           this.score += 10;
           this.alienSpeed += 0.05;
           this.bullets.splice(i, 1);
-          scorePop(this, this.ox + b.x, this.oy + b.y, "+10", HEX.lime);
+          sfxHit();
+          // Explosion particles
+          const ex = this.ox + b.x;
+          const ey = this.oy + b.y;
+          const newParts = spawnExplosion(this, ex, ey, {
+            count: 12, colors: [PALETTE.green, PALETTE.lime, PALETTE.yellow], speed: 80,
+          });
+          // We'll add these to a particle array
+          for (const p of newParts) {
+            this.gameOverParticles.push({ ...p, vx: p.vx, vy: p.vy });
+          }
+          scorePop(this, ex, ey, "+10", HEX.lime);
           break;
         }
       }
@@ -198,6 +246,22 @@ class SpaceInvadersScene extends Phaser.Scene {
     }
     this.scoreText.setText(String(this.score));
     this.livesText.setText(String(this.lives));
+
+    if (this.gameOver) {
+      sfxGameOver();
+      this.gameOverTimer = 0;
+      this.gameOverFlash = 0;
+      // Big explosion
+      const px = this.ox + this.playerX + this.playerW / 2;
+      const py = this.oy + this.playH - 20 * this.scale_;
+      const newParts = spawnExplosion(this, px, py, {
+        count: 30, colors: [PALETTE.red, PALETTE.orange, PALETTE.yellow, PALETTE.cyan], speed: 150,
+      });
+      for (const p of newParts) {
+        this.gameOverParticles.push({ ...p, vx: p.vx, vy: p.vy });
+      }
+    }
+
     this.draw();
   }
 
@@ -209,7 +273,7 @@ class SpaceInvadersScene extends Phaser.Scene {
     const w = this.scale.width;
     const h = this.scale.height;
 
-    // Background with stars
+    // Background with stars (parallax scrolling)
     this.bg.draw(g, w, h);
     updateStarField(this.stars, 0.016, 20, w, h);
     drawStarField(g, this.stars);
@@ -239,15 +303,22 @@ class SpaceInvadersScene extends Phaser.Scene {
       g.lineBetween(this.ox, y, this.ox + this.playW, y);
     }
 
+    // Bullet trail particles
+    for (const p of this.bulletParticles) {
+      g.fillStyle(p.color, p.life * 0.4);
+      g.fillCircle(this.ox + p.x, this.oy + p.y, 2 * p.life);
+    }
+
     // Player ship with 3D shading
     const pw = this.playerW, ph = 20 * this.scale_;
     const sx = this.ox + this.playerX;
     const sy = this.oy + this.playH - ph - 10 * this.scale_;
 
-    // Engine glow
-    g.fillStyle(PALETTE.cyan, 0.15);
+    // Engine glow (pulsating)
+    const glowPulse = 0.1 + Math.sin(this.engineGlowPulse) * 0.06;
+    g.fillStyle(PALETTE.cyan, glowPulse);
     g.fillCircle(sx + pw / 2, sy + ph + 6, pw * 0.6);
-    g.fillStyle(PALETTE.cyan, 0.3);
+    g.fillStyle(PALETTE.cyan, glowPulse * 2);
     g.fillCircle(sx + pw / 2, sy + ph + 4, pw * 0.35);
 
     // Engine particles
@@ -288,10 +359,10 @@ class SpaceInvadersScene extends Phaser.Scene {
       g.fillCircle(this.ox + b.x, this.oy + b.y + bh / 2 + 6, bw * 0.8);
     }
 
-    // Aliens with 3D detail
+    // Aliens with 3D detail and float animation
     const aw = 30 * this.scale_, ah = 20 * this.scale_;
     for (const a of this.aliens) if (a.alive) {
-      const floatY = Math.sin(this.alienFloatTimer * 2 + a.floatOff) * 3 * this.scale_;
+      const floatY = Math.sin(this.alienFloatTimer * 2 + a.floatOff) * 4 * this.scale_;
       const ax = this.ox + a.x;
       const ay = this.oy + a.y + floatY;
       const alienColor = (a.index % 3 === 0) ? PALETTE.green : ((a.index % 3 === 1) ? PALETTE.lime : PALETTE.accentSoft);
@@ -310,13 +381,16 @@ class SpaceInvadersScene extends Phaser.Scene {
         cornerRadius: 5,
       });
 
-      // Alien eyes
-      g.fillStyle(0xffffff, 0.8);
-      g.fillCircle(ax + aw * 0.3, ay + ah * 0.3, aw * 0.1);
-      g.fillCircle(ax + aw * 0.7, ay + ah * 0.3, aw * 0.1);
-      g.fillStyle(0x000000, 0.8);
-      g.fillCircle(ax + aw * 0.3, ay + ah * 0.3, aw * 0.05);
-      g.fillCircle(ax + aw * 0.7, ay + ah * 0.3, aw * 0.05);
+      // Alien eyes (blink occasionally)
+      const blink = Math.sin(this.alienFloatTimer * 3 + a.floatOff * 2) > 0.8;
+      if (!blink) {
+        g.fillStyle(0xffffff, 0.8);
+        g.fillCircle(ax + aw * 0.3, ay + ah * 0.3, aw * 0.1);
+        g.fillCircle(ax + aw * 0.7, ay + ah * 0.3, aw * 0.1);
+        g.fillStyle(0x000000, 0.8);
+        g.fillCircle(ax + aw * 0.3, ay + ah * 0.3, aw * 0.05);
+        g.fillCircle(ax + aw * 0.7, ay + ah * 0.3, aw * 0.05);
+      }
 
       // Alien mouth/teeth
       g.fillStyle(0xffffff, 0.3);
@@ -335,14 +409,54 @@ class SpaceInvadersScene extends Phaser.Scene {
       g.fillCircle(ax + aw * 0.7, ay - 4 * this.scale_, 1.5 * this.scale_);
     }
 
-    // Game over overlay
+    // Game over particles
+    for (const p of this.gameOverParticles) {
+      const alpha = Phaser.Math.Clamp(p.life / p.maxLife * 1.5, 0, 1);
+      const radius = p.size * (0.3 + 0.7 * (p.life / p.maxLife));
+      g.fillStyle(p.color, alpha);
+      g.fillCircle(p.x, p.y, radius);
+    }
+
+    // Game over overlay with flash transition
     if (this.gameOver) {
-      g.fillStyle(0x000000, 0.6);
+      // Flash effect
+      const flashAlpha = Math.max(0, 0.8 - this.gameOverTimer * 2);
+      if (flashAlpha > 0) {
+        g.fillStyle(0xffffff, flashAlpha);
+        g.fillRect(this.ox, this.oy, this.playW, this.playH);
+      }
+
+      const alpha = Math.min(0.6, this.gameOverTimer * 2);
+      g.fillStyle(0x000000, alpha);
       g.fillRect(this.ox, this.oy, this.playW, this.playH);
-      g.lineStyle(2, PALETTE.cyan, 0.3);
+
+      // Decorative border
+      const borderPulse = 0.2 + Math.sin(this.gameOverTimer * 3) * 0.1;
+      g.lineStyle(2, PALETTE.cyan, borderPulse);
       g.strokeRect(this.ox + 20, this.oy + 20, this.playW - 40, this.playH - 40);
-      this.gameOverText.setPosition(this.ox + this.playW / 2, this.oy + this.playH / 2 - 8).setVisible(true);
-      this.restartHintText.setPosition(this.ox + this.playW / 2, this.oy + this.playH / 2 + 34).setVisible(true);
+
+      // Inner decorative corners
+      const cornerSize = 20;
+      g.lineStyle(2, PALETTE.accent, 0.3);
+      // Top-left
+      g.lineBetween(this.ox + 20, this.oy + 20, this.ox + 20 + cornerSize, this.oy + 20);
+      g.lineBetween(this.ox + 20, this.oy + 20, this.ox + 20, this.oy + 20 + cornerSize);
+      // Top-right
+      g.lineBetween(this.ox + this.playW - 20, this.oy + 20, this.ox + this.playW - 20 - cornerSize, this.oy + 20);
+      g.lineBetween(this.ox + this.playW - 20, this.oy + 20, this.ox + this.playW - 20, this.oy + 20 + cornerSize);
+      // Bottom-left
+      g.lineBetween(this.ox + 20, this.oy + this.playH - 20, this.ox + 20 + cornerSize, this.oy + this.playH - 20);
+      g.lineBetween(this.ox + 20, this.oy + this.playH - 20, this.ox + 20, this.oy + this.playH - 20 - cornerSize);
+      // Bottom-right
+      g.lineBetween(this.ox + this.playW - 20, this.oy + this.playH - 20, this.ox + this.playW - 20 - cornerSize, this.oy + this.playH - 20);
+      g.lineBetween(this.ox + this.playW - 20, this.oy + this.playH - 20, this.ox + this.playW - 20, this.oy + this.playH - 20 - cornerSize);
+
+      const cx = this.ox + this.playW / 2;
+      const cy = this.oy + this.playH / 2;
+
+      const textAlpha = Math.min(1, (this.gameOverTimer - 0.3) * 2);
+      this.gameOverText.setPosition(cx, cy - 8).setVisible(true).setAlpha(textAlpha);
+      this.restartHintText.setPosition(cx, cy + 30).setVisible(true).setAlpha(Math.max(0, (this.gameOverTimer - 0.8) * 2));
     } else {
       this.gameOverText.setVisible(false);
       this.restartHintText.setVisible(false);

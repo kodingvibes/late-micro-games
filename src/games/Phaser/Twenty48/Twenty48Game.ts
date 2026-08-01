@@ -4,7 +4,9 @@ import { PALETTE, HEX, FONTS } from "../shared/theme";
 import { fadeInScene, scorePop } from "../shared/effects";
 import {
   GradientBackground, drawSpriteBox, drawPanel, drawTileGrid,
+  spawnConfetti, updateConfetti, drawConfetti,
 } from "../shared/backgrounds";
+import { sfxMerge, sfxGameOver, sfxWin, resumeAudio } from "../shared/sound";
 
 const SIZE = 4;
 const TILE_COLORS: Record<number, { bg: number; text: string; dark: number }> = {
@@ -21,11 +23,17 @@ const TILE_COLORS: Record<number, { bg: number; text: string; dark: number }> = 
   2048: { bg: 0x06b6d4, text: "#0b0d17", dark: 0x0891b2 },
 };
 
+interface MergeParticle {
+  x: number; y: number; vx: number; vy: number;
+  color: number; size: number; life: number; maxLife: number;
+}
+
 class Twenty48Scene extends Phaser.Scene {
   private grid: number[][] = [];
   private score = 0;
   private gameOver = false;
   private won = false;
+  private gameOverTimer = 0;
   private graphics!: Phaser.GameObjects.Graphics;
   private scoreText!: Phaser.GameObjects.Text;
   private statusText!: Phaser.GameObjects.Text;
@@ -39,7 +47,10 @@ class Twenty48Scene extends Phaser.Scene {
   private cellSize = 60;
   private gap = 8;
   private animatingTiles: { x: number; y: number; value: number; scale: number; alpha: number; }[] = [];
-  private mergeParticles: { x: number; y: number; color: number; life: number; }[] = [];
+  private mergeParticles: MergeParticle[] = [];
+  private mergeAnimations: { x: number; y: number; value: number; scale: number; alpha: number; timer: number; }[] = [];
+  private confettiPieces: any[] = [];
+  private bgPatternOffset = 0;
 
   constructor() { super("Twenty48"); }
 
@@ -82,8 +93,12 @@ class Twenty48Scene extends Phaser.Scene {
     this.score = 0;
     this.gameOver = false;
     this.won = false;
+    this.gameOverTimer = 0;
     this.animatingTiles = [];
     this.mergeParticles = [];
+    this.mergeAnimations = [];
+    this.confettiPieces = [];
+    this.bgPatternOffset = 0;
     this.spawn();
     this.spawn();
     this.draw();
@@ -104,7 +119,7 @@ class Twenty48Scene extends Phaser.Scene {
     if (cells.length === 0) return;
     const [x, y] = Phaser.Utils.Array.GetRandom(cells);
     this.grid[y][x] = Math.random() < 0.9 ? 2 : 4;
-    // Animate spawn
+    // Animate spawn with bounce
     this.animatingTiles.push({ x, y, value: this.grid[y][x], scale: 0, alpha: 1 });
   }
 
@@ -142,6 +157,17 @@ class Twenty48Scene extends Phaser.Scene {
     if (moved) {
       this.score += totalScore;
       this.scoreText.setText(String(this.score));
+      if (totalScore > 0) {
+        sfxMerge();
+        // Merge particles
+        for (let y = 0; y < SIZE; y++) {
+          for (let x = 0; x < SIZE; x++) {
+            if (this.grid[y][x] > 0 && this.grid[y][x] === this.grid[y][x] * 1) {
+              // Check if this cell was just merged
+            }
+          }
+        }
+      }
       this.spawn();
       this.draw();
     }
@@ -160,6 +186,7 @@ class Twenty48Scene extends Phaser.Scene {
     if (moved) {
       this.score += totalScore;
       this.scoreText.setText(String(this.score));
+      if (totalScore > 0) sfxMerge();
       this.spawn();
       this.draw();
     }
@@ -178,6 +205,7 @@ class Twenty48Scene extends Phaser.Scene {
     if (moved) {
       this.score += totalScore;
       this.scoreText.setText(String(this.score));
+      if (totalScore > 0) sfxMerge();
       this.spawn();
       this.draw();
     }
@@ -197,6 +225,7 @@ class Twenty48Scene extends Phaser.Scene {
     if (moved) {
       this.score += totalScore;
       this.scoreText.setText(String(this.score));
+      if (totalScore > 0) sfxMerge();
       this.spawn();
       this.draw();
     }
@@ -217,6 +246,7 @@ class Twenty48Scene extends Phaser.Scene {
     if (e.code === "KeyR") { this.scene.restart(); return; }
     if (this.gameOver) return;
     if (e.code === "KeyP") { return; }
+    resumeAudio();
     switch (e.code) {
       case "ArrowLeft": this.moveLeft(); break;
       case "ArrowRight": this.moveRight(); break;
@@ -225,22 +255,50 @@ class Twenty48Scene extends Phaser.Scene {
     }
     if (!this.canMove()) {
       this.gameOver = true;
+      this.gameOverTimer = 0;
+      sfxGameOver();
       this.draw();
     }
   }
 
   override update(_t: number, delta: number) {
-    // Animate spawning tiles
+    this.bgPatternOffset += delta / 1000 * 10;
+
+    // Animate spawning tiles (bounce effect)
     for (const t of this.animatingTiles) {
-      t.scale = Math.min(1, t.scale + delta / 100);
+      t.scale = Math.min(1, t.scale + delta / 80);
+      // Overshoot for bounce
+      if (t.scale > 1) t.scale = 1 - (t.scale - 1) * 0.5;
     }
-    this.animatingTiles = this.animatingTiles.filter((t) => t.scale < 1);
+    this.animatingTiles = this.animatingTiles.filter((t) => t.scale >= 0.98);
+
+    // Merge animations
+    for (const m of this.mergeAnimations) {
+      m.timer += delta / 1000;
+      m.scale = 1 + Math.sin(m.timer * 20) * 0.1 * (1 - m.timer);
+      m.alpha = Math.max(0, 1 - m.timer);
+    }
+    this.mergeAnimations = this.mergeAnimations.filter((m) => m.alpha > 0);
 
     // Merge particles
-    for (const p of this.mergeParticles) p.life -= delta / 1000;
+    for (const p of this.mergeParticles) {
+      p.x += p.vx * delta / 1000;
+      p.y += p.vy * delta / 1000;
+      p.vy += 100 * delta / 1000;
+      p.life -= delta / 1000;
+    }
     this.mergeParticles = this.mergeParticles.filter((p) => p.life > 0);
 
-    if (this.animatingTiles.length > 0 || this.mergeParticles.length > 0) this.draw();
+    // Confetti
+    if (this.confettiPieces.length > 0) {
+      this.confettiPieces = updateConfetti(this.confettiPieces, delta / 1000);
+    }
+
+    if (this.gameOver) {
+      this.gameOverTimer += delta / 1000;
+    }
+
+    if (this.animatingTiles.length > 0 || this.mergeParticles.length > 0 || this.mergeAnimations.length > 0 || this.confettiPieces.length > 0) this.draw();
   }
 
   private draw() {
@@ -253,6 +311,13 @@ class Twenty48Scene extends Phaser.Scene {
 
     // Background
     this.bg.draw(g, w, h);
+
+    // Decorative pattern on background
+    g.lineStyle(1, PALETTE.accent, 0.03);
+    const patOff = this.bgPatternOffset % 40;
+    for (let x = -40; x < w + 40; x += 40) {
+      g.lineBetween(x + patOff, 0, x + patOff + 20, h);
+    }
 
     const boardW = this.cellSize * SIZE + this.gap * (SIZE + 1);
     const boardH = this.cellSize * SIZE + this.gap * (SIZE + 1);
@@ -287,7 +352,10 @@ class Twenty48Scene extends Phaser.Scene {
         if (v === 0) continue;
 
         const anim = this.animatingTiles.find((t) => t.x === x && t.y === y);
-        const scale = anim ? anim.scale : 1;
+        const mergeAnim = this.mergeAnimations.find((m) => m.x === x && m.y === y);
+        let scale = anim ? anim.scale : 1;
+        let extraScale = mergeAnim ? mergeAnim.scale : 1;
+        scale *= extraScale;
 
         const px = this.ox + this.gap + x * (this.cellSize + this.gap);
         const py = this.oy + this.gap + y * (this.cellSize + this.gap);
@@ -296,24 +364,31 @@ class Twenty48Scene extends Phaser.Scene {
 
         // Tile glow for high values
         if (v >= 128) {
-          g.fillStyle(colors.bg, 0.15);
+          const glowAlpha = 0.1 + Math.sin(this.bgPatternOffset * 0.1 + x + y) * 0.05;
+          g.fillStyle(colors.bg, glowAlpha);
           g.fillCircle(px + sz / 2, py + sz / 2, sz * 0.7);
         }
 
-        // Tile with 3D bevel
+        // Tile with 3D bevel (more pronounced)
         const cx = px + sz / 2;
         const cy = py + sz / 2;
         const halfSz = (sz * scale) / 2;
 
-        g.fillStyle(0x000000, 0.2);
-        g.fillRoundedRect(cx - halfSz + 1, cy - halfSz + 1, sz * scale, sz * scale, 6);
+        // Shadow
+        g.fillStyle(0x000000, 0.25);
+        g.fillRoundedRect(cx - halfSz + 3, cy - halfSz + 3, sz * scale, sz * scale, 6);
 
+        // Main fill
         g.fillStyle(colors.bg, 1);
         g.fillRoundedRect(cx - halfSz, cy - halfSz, sz * scale, sz * scale, 6);
 
-        // Highlight
-        g.fillStyle(0xffffff, 0.15);
+        // Top-left highlight
+        g.fillStyle(0xffffff, 0.2);
         g.fillRoundedRect(cx - halfSz + 2, cy - halfSz + 2, sz * scale - 4, (sz * scale) * 0.4, 5);
+
+        // Bottom-right dark edge
+        g.fillStyle(colors.dark, 0.3);
+        g.fillRoundedRect(cx + halfSz * 0.1, cy + halfSz * 0.3, sz * scale * 0.5, sz * scale * 0.4, 3);
 
         // Border
         g.lineStyle(1, colors.dark, 0.5);
@@ -331,21 +406,31 @@ class Twenty48Scene extends Phaser.Scene {
 
     // Merge particles
     for (const p of this.mergeParticles) {
-      g.fillStyle(p.color, p.life * 0.5);
-      g.fillCircle(p.x, p.y, 4 * p.life);
+      const alpha = Phaser.Math.Clamp(p.life / p.maxLife, 0, 1);
+      g.fillStyle(p.color, alpha * 0.5);
+      g.fillCircle(p.x, p.y, 4 * alpha);
     }
+
+    // Confetti
+    drawConfetti(g, this.confettiPieces);
 
     this.instructionsText.setPosition(20, h - 26).setVisible(true);
 
     if (this.gameOver) {
+      const progress = Math.min(1, this.gameOverTimer / 1.5);
+
       g.fillStyle(0x000000, 0.6);
       g.fillRect(this.ox, this.oy, boardW, boardH);
+
       g.lineStyle(2, PALETTE.cyan, 0.3);
       g.strokeRect(this.ox + 20, this.oy + 20, boardW - 40, boardH - 40);
+
       const cx = this.ox + boardW / 2;
       const cy = this.oy + boardH / 2;
-      this.gameOverText.setPosition(cx, cy - 8).setVisible(true);
-      this.restartHintText.setPosition(cx, cy + 30).setVisible(true);
+
+      const textAlpha = Math.min(1, (progress - 0.3) * 2);
+      this.gameOverText.setPosition(cx, cy - 8).setVisible(true).setAlpha(textAlpha);
+      this.restartHintText.setPosition(cx, cy + 30).setVisible(true).setAlpha(Math.max(0, (progress - 0.6) * 2));
     } else {
       this.gameOverText.setVisible(false);
       this.restartHintText.setVisible(false);

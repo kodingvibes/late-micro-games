@@ -5,6 +5,7 @@ import { fadeInScene, screenShake, scorePop } from "../shared/effects";
 import {
   GradientBackground, drawSpriteBox, drawPanel, drawTileGrid,
 } from "../shared/backgrounds";
+import { sfxLineClear, sfxMove, sfxRotate, sfxDrop, sfxGameOver, resumeAudio } from "../shared/sound";
 
 const COLS = 10;
 const ROWS = 20;
@@ -21,12 +22,18 @@ const SHAPES: number[][][] = [
 const COLORS = [PALETTE.yellow, PALETTE.cyan, PALETTE.violet, PALETTE.orange, PALETTE.accent, PALETTE.green, PALETTE.red];
 const DARK_COLORS = [0x854d0e, 0x0891b2, 0x5b21b6, 0x9a3412, 0x3730a3, 0x166534, 0x991b1b];
 
+interface LineClearParticle {
+  x: number; y: number; vx: number; vy: number;
+  color: number; size: number; life: number; maxLife: number;
+}
+
 class TetrisScene extends Phaser.Scene {
   private board: number[][] = [];
   private current!: { shape: number[][]; color: number; darkColor: number; x: number; y: number };
   private score = 0;
   private lines = 0;
   private gameOver = false;
+  private gameOverTimer = 0;
   private paused = false;
   private dropTimer = 0;
   private dropDelay = 0.6;
@@ -44,6 +51,9 @@ class TetrisScene extends Phaser.Scene {
   private oy = 0;
   private flashLines: number[] = [];
   private flashTimer = 0;
+  private lineClearParticles: LineClearParticle[] = [];
+  private cascadeRows: number[] = [];
+  private cascadeTimer = 0;
 
   constructor() { super("Tetris"); }
 
@@ -129,6 +139,7 @@ class TetrisScene extends Phaser.Scene {
     for (let y = ROWS - 1; y >= 0; y--) {
       if (this.board[y].every((c) => c !== -1)) {
         this.flashLines.push(y);
+        this.cascadeRows.push(y);
         this.board.splice(y, 1);
         this.board.unshift(Array(COLS).fill(-1));
         cleared++;
@@ -146,6 +157,26 @@ class TetrisScene extends Phaser.Scene {
       const cy = Math.max(70, Math.floor((this.scale.height - ROWS * CELL) / 2)) + (ROWS * CELL) / 2;
       scorePop(this, cx, cy, `+${cleared * 100 * cleared}`);
       this.flashTimer = 0.3;
+      sfxLineClear();
+
+      // Spawn line clear particles
+      for (const row of this.cascadeRows) {
+        for (let x = 0; x < COLS; x++) {
+          for (let i = 0; i < 3; i++) {
+            this.lineClearParticles.push({
+              x: this.ox + x * CELL + CELL / 2,
+              y: this.oy + row * CELL + CELL / 2,
+              vx: (Math.random() - 0.5) * 120,
+              vy: -Math.random() * 100 - 50,
+              color: COLORS[Math.floor(Math.random() * COLORS.length)],
+              size: 2 + Math.random() * 3,
+              life: 0.5 + Math.random() * 0.3,
+              maxLife: 0.8,
+            });
+          }
+        }
+      }
+      this.cascadeTimer = 0.5;
     }
   }
 
@@ -172,11 +203,36 @@ class TetrisScene extends Phaser.Scene {
     if (e.code === "KeyP") { this.paused = !this.paused; this.statusText.setText(this.paused ? "PAUSA" : ""); return; }
     if (this.paused) return;
     switch (e.code) {
-      case "ArrowLeft": if (this.valid(this.current.shape, this.current.x - 1, this.current.y)) this.current.x--; break;
-      case "ArrowRight": if (this.valid(this.current.shape, this.current.x + 1, this.current.y)) this.current.x++; break;
-      case "ArrowUp": case "KeyX": this.rotate(); break;
-      case "ArrowDown": if (this.valid(this.current.shape, this.current.x, this.current.y + 1)) { this.current.y++; this.score += 1; } break;
-      case "Space": while (this.valid(this.current.shape, this.current.x, this.current.y + 1)) { this.current.y++; this.score += 2; } this.lock(); break;
+      case "ArrowLeft":
+        if (this.valid(this.current.shape, this.current.x - 1, this.current.y)) {
+          this.current.x--;
+          sfxMove();
+        }
+        break;
+      case "ArrowRight":
+        if (this.valid(this.current.shape, this.current.x + 1, this.current.y)) {
+          this.current.x++;
+          sfxMove();
+        }
+        break;
+      case "ArrowUp": case "KeyX":
+        this.rotate();
+        sfxRotate();
+        break;
+      case "ArrowDown":
+        if (this.valid(this.current.shape, this.current.x, this.current.y + 1)) {
+          this.current.y++;
+          this.score += 1;
+        }
+        break;
+      case "Space":
+        while (this.valid(this.current.shape, this.current.x, this.current.y + 1)) {
+          this.current.y++;
+          this.score += 2;
+        }
+        sfxDrop();
+        this.lock();
+        break;
     }
     this.scoreText.setText(String(this.score));
     this.linesText.setText(String(this.lines));
@@ -184,7 +240,22 @@ class TetrisScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number) {
-    if (this.gameOver || this.paused) return;
+    if (this.gameOver) {
+      this.gameOverTimer += delta / 1000;
+      // Cascade animation for game over
+      this.cascadeTimer += delta / 1000;
+      // Update line clear particles
+      for (const p of this.lineClearParticles) {
+        p.x += p.vx * delta / 1000;
+        p.y += p.vy * delta / 1000;
+        p.vy += 200 * delta / 1000;
+        p.life -= delta / 1000;
+      }
+      this.lineClearParticles = this.lineClearParticles.filter((p) => p.life > 0);
+      this.draw();
+      return;
+    }
+    if (this.paused) return;
     this.dropTimer += delta / 1000;
     if (this.dropTimer >= this.dropDelay) {
       this.dropTimer = 0;
@@ -196,6 +267,14 @@ class TetrisScene extends Phaser.Scene {
       this.flashTimer -= delta / 1000;
       this.draw();
     }
+    // Update line clear particles
+    for (const p of this.lineClearParticles) {
+      p.x += p.vx * delta / 1000;
+      p.y += p.vy * delta / 1000;
+      p.vy += 200 * delta / 1000;
+      p.life -= delta / 1000;
+    }
+    this.lineClearParticles = this.lineClearParticles.filter((p) => p.life > 0);
   }
 
   private draw() {
@@ -254,7 +333,7 @@ class TetrisScene extends Phaser.Scene {
       }
     }
 
-    // Ghost piece (shadow)
+    // Ghost piece (shadow) - more visible
     if (this.current && !this.gameOver) {
       let gy = this.current.y;
       while (this.valid(this.current.shape, this.current.x, gy + 1)) gy++;
@@ -264,11 +343,22 @@ class TetrisScene extends Phaser.Scene {
             if (!this.current.shape[y][x]) continue;
             const px = this.ox + (this.current.x + x) * CELL + 1;
             const py = this.oy + (gy + y) * CELL + 1;
-            g.lineStyle(1, this.current.color, 0.3);
+            // Ghost fill
+            g.fillStyle(this.current.color, 0.1);
+            g.fillRoundedRect(px, py, CELL - 2, CELL - 2, 4);
+            // Ghost border
+            g.lineStyle(2, this.current.color, 0.4);
             g.strokeRoundedRect(px, py, CELL - 2, CELL - 2, 4);
           }
         }
       }
+    }
+
+    // Line clear particles
+    for (const p of this.lineClearParticles) {
+      const alpha = Phaser.Math.Clamp(p.life / p.maxLife, 0, 1);
+      g.fillStyle(p.color, alpha * 0.7);
+      g.fillCircle(p.x, p.y, p.size * alpha);
     }
 
     // Next piece preview
@@ -298,15 +388,25 @@ class TetrisScene extends Phaser.Scene {
 
     this.instructionsText.setPosition(20, h - 26).setVisible(true);
 
+    // Game over with cascade animation
     if (this.gameOver) {
+      const progress = Math.min(1, this.gameOverTimer / 1.5);
+
+      // Cascade fill from top
+      const cascadeH = boardH * progress;
       g.fillStyle(0x000000, 0.6);
-      g.fillRect(this.ox, this.oy, boardW, boardH);
+      g.fillRect(this.ox, this.oy, boardW, cascadeH);
+
+      // Decorative border
       g.lineStyle(2, PALETTE.cyan, 0.3);
       g.strokeRect(this.ox + 20, this.oy + 20, boardW - 40, boardH - 40);
+
       const cx = this.ox + boardW / 2;
       const cy = this.oy + boardH / 2;
-      this.gameOverText.setPosition(cx, cy - 8).setVisible(true);
-      this.restartHintText.setPosition(cx, cy + 30).setVisible(true);
+
+      const textAlpha = Math.min(1, (progress - 0.3) * 2);
+      this.gameOverText.setPosition(cx, cy - 8).setVisible(true).setAlpha(textAlpha);
+      this.restartHintText.setPosition(cx, cy + 30).setVisible(true).setAlpha(Math.max(0, (progress - 0.6) * 2));
     } else {
       this.gameOverText.setVisible(false);
       this.restartHintText.setVisible(false);
@@ -323,19 +423,19 @@ class TetrisScene extends Phaser.Scene {
     const darkColor = idx >= 0 ? DARK_COLORS[idx] : 0x1e213a;
 
     // 3D bevel: shadow bottom-right
-    g.fillStyle(0x000000, 0.3);
-    g.fillRoundedRect(px + 1, py + 1, sz, sz, 4);
+    g.fillStyle(0x000000, 0.35);
+    g.fillRoundedRect(px + 2, py + 2, sz, sz, 4);
 
     // Main fill
     g.fillStyle(color, 1);
     g.fillRoundedRect(px, py, sz, sz, 4);
 
-    // Top-left highlight
-    g.fillStyle(0xffffff, 0.2);
+    // Top-left highlight (stronger)
+    g.fillStyle(0xffffff, 0.25);
     g.fillRoundedRect(px + 1, py + 1, sz - 2, sz * 0.4, 3);
 
     // Bottom-right dark edge
-    g.fillStyle(darkColor, 0.3);
+    g.fillStyle(darkColor, 0.35);
     g.fillRoundedRect(px + sz * 0.5, py + sz * 0.6, sz * 0.5, sz * 0.4, 2);
 
     // Outline

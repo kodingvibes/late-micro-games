@@ -5,7 +5,9 @@ import { fadeInScene, screenShake } from "../shared/effects";
 import { spawnExplosion, updateParticles, drawParticles } from "../shared/particles";
 import {
   GradientBackground, drawSpriteBox, drawSpriteCircle, drawPanel, drawTileGrid,
+  spawnConfetti, updateConfetti, drawConfetti,
 } from "../shared/backgrounds";
+import { sfxExplosion, sfxFlag, sfxReveal, sfxWin, sfxGameOver, resumeAudio } from "../shared/sound";
 
 const COLS = 10;
 const ROWS = 10;
@@ -17,6 +19,8 @@ class MinesweeperScene extends Phaser.Scene {
   private cells: Cell[][] = [];
   private revealed = 0;
   private gameOver = false;
+  private gameWon = false;
+  private gameOverTimer = 0;
   private firstClick = true;
   private graphics!: Phaser.GameObjects.Graphics;
   private statusText!: Phaser.GameObjects.Text;
@@ -33,6 +37,8 @@ class MinesweeperScene extends Phaser.Scene {
   private winCascadeTimer = 0;
   private winCascadeCells: [number, number][] = [];
   private flagCount = 0;
+  private chainExplosionParticles: any[] = [];
+  private confettiPieces: any[] = [];
 
   constructor() { super("Minesweeper"); }
 
@@ -78,9 +84,13 @@ class MinesweeperScene extends Phaser.Scene {
     );
     this.revealed = 0;
     this.gameOver = false;
+    this.gameWon = false;
+    this.gameOverTimer = 0;
     this.firstClick = true;
     this.flagCount = 0;
     this._explosionParticles = [];
+    this.chainExplosionParticles = [];
+    this.confettiPieces = [];
     this.winCascadeCells = [];
     this.winCascadeTimer = 0;
     this.statusText.setText("");
@@ -122,14 +132,28 @@ class MinesweeperScene extends Phaser.Scene {
     this.revealed++;
     if (c.mine) {
       this.gameOver = true;
+      this.gameOverTimer = 0;
       this.statusText.setText("BOOM");
       this.statusText.setColor(HEX.red);
       screenShake(this, 0.008, 300);
+      sfxExplosion();
       const px = this.ox + x * this.cellSize + this.cellSize / 2;
       const py = this.oy + y * this.cellSize + this.cellSize / 2;
       this._explosionParticles = spawnExplosion(this, px, py, { count: 25, colors: [PALETTE.red, PALETTE.orange, PALETTE.yellow], speed: 130 });
+      // Chain explosion on all mines
+      for (let my = 0; my < ROWS; my++) {
+        for (let mx = 0; mx < COLS; mx++) {
+          if (this.cells[my][mx].mine) {
+            const mpx = this.ox + mx * this.cellSize + this.cellSize / 2;
+            const mpy = this.oy + my * this.cellSize + this.cellSize / 2;
+            const chainParts = spawnExplosion(this, mpx, mpy, { count: 10, colors: [PALETTE.red, PALETTE.orange, PALETTE.yellow], speed: 80 });
+            this.chainExplosionParticles.push(...chainParts);
+          }
+        }
+      }
       return;
     }
+    sfxReveal();
     if (c.adjacent === 0) {
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
@@ -153,10 +177,12 @@ class MinesweeperScene extends Phaser.Scene {
       c.flagged = !c.flagged;
       this.flagCount += c.flagged ? 1 : -1;
       this.minesText.setText(String(MINES - this.flagCount));
+      sfxFlag();
       this.draw();
       return;
     }
 
+    resumeAudio();
     if (this.firstClick) {
       this.firstClick = false;
       this.placeMines(x, y);
@@ -168,6 +194,13 @@ class MinesweeperScene extends Phaser.Scene {
       this.statusText.setText("WIN!");
       this.statusText.setColor(HEX.lime);
       this.gameOver = true;
+      this.gameWon = true;
+      this.gameOverTimer = 0;
+      sfxWin();
+      // Confetti!
+      const cx = this.ox + (COLS * this.cellSize) / 2;
+      const cy = this.oy + (ROWS * this.cellSize) / 2;
+      this.confettiPieces = spawnConfetti(cx, cy, 50);
     }
   }
 
@@ -176,8 +209,17 @@ class MinesweeperScene extends Phaser.Scene {
   }
 
   override update(_t: number, delta: number) {
-    if (this._explosionParticles.length > 0) {
-      this._explosionParticles = updateParticles(this._explosionParticles, delta / 1000);
+    if (this.gameOver) {
+      this.gameOverTimer += delta / 1000;
+      if (this._explosionParticles.length > 0) {
+        this._explosionParticles = updateParticles(this._explosionParticles, delta / 1000);
+      }
+      if (this.chainExplosionParticles.length > 0) {
+        this.chainExplosionParticles = updateParticles(this.chainExplosionParticles, delta / 1000);
+      }
+      if (this.confettiPieces.length > 0) {
+        this.confettiPieces = updateConfetti(this.confettiPieces, delta / 1000);
+      }
       this.draw();
     }
   }
@@ -222,21 +264,47 @@ class MinesweeperScene extends Phaser.Scene {
 
         if (c.revealed) {
           if (c.mine) {
-            // Mine with 3D detail
-            drawSpriteCircle(g, px + sz / 2, py + sz / 2, sz * 0.4, {
-              fillColor: PALETTE.red,
-              outline: { color: 0x991b1b, width: 2 },
-              highlight: { alpha: 0.4, size: 0.35 },
-            });
+            // Mine with 3D detail - spherical body
+            const cx = px + sz / 2;
+            const cy = py + sz / 2;
+            const mineR = sz * 0.4;
+
+            // Mine body (sphere)
+            g.fillStyle(0x1e293b, 1);
+            g.fillCircle(cx, cy, mineR);
+
+            // Mine gradient (top highlight)
+            g.fillStyle(0x334155, 0.6);
+            g.fillCircle(cx - mineR * 0.1, cy - mineR * 0.1, mineR * 0.7);
+
+            // Mine highlight
+            g.fillStyle(0xffffff, 0.15);
+            g.fillCircle(cx - mineR * 0.25, cy - mineR * 0.25, mineR * 0.3);
+
             // Mine spikes
-            g.lineStyle(1, PALETTE.red, 0.5);
+            g.lineStyle(2, 0x475569, 0.8);
             for (let i = 0; i < 6; i++) {
               const a = (i / 6) * Math.PI * 2;
-              g.lineBetween(px + sz / 2, py + sz / 2, px + sz / 2 + Math.cos(a) * sz * 0.5, py + sz / 2 + Math.sin(a) * sz * 0.5);
+              const innerR = mineR * 0.7;
+              const outerR = mineR * 1.2;
+              g.lineBetween(
+                cx + Math.cos(a) * innerR, cy + Math.sin(a) * innerR,
+                cx + Math.cos(a) * outerR, cy + Math.sin(a) * outerR,
+              );
+              // Spike tip
+              g.fillStyle(0x64748b, 0.6);
+              g.fillCircle(cx + Math.cos(a) * outerR, cy + Math.sin(a) * outerR, 2);
             }
-            // Mine highlight
-            g.fillStyle(0xffffff, 0.2);
-            g.fillCircle(px + sz * 0.35, py + sz * 0.35, sz * 0.08);
+
+            // Detonator
+            g.fillStyle(0x94a3b8, 0.8);
+            g.fillRect(cx - 2, cy - mineR - 4, 4, 6);
+            g.fillStyle(0xef4444, 0.8);
+            g.fillCircle(cx, cy - mineR - 4, 3);
+
+            // Outline
+            g.lineStyle(1, 0x991b1b, 0.5);
+            g.strokeCircle(cx, cy, mineR);
           } else {
             // Revealed cell (sunken)
             g.fillStyle(PALETTE.surfaceLight, 0.6);
@@ -252,20 +320,34 @@ class MinesweeperScene extends Phaser.Scene {
             }
           }
         } else {
-          // Unrevealed cell with 3D raised effect
+          // Unrevealed cell with 3D raised effect (more pronounced)
           drawSpriteBox(g, px, py, sz, sz, {
             fillColor: PALETTE.surfaceLight,
             outline: { color: PALETTE.border, width: 1 },
-            highlight: { x: 0.2, y: 0.2, size: 0.3, alpha: 0.3 },
-            shadow: { offset: 2, alpha: 0.2 },
+            highlight: { x: 0.2, y: 0.2, size: 0.35, alpha: 0.35 },
+            shadow: { offset: 3, alpha: 0.25 },
             cornerRadius: r,
           });
           if (c.flagged) {
-            // Flag
-            g.lineStyle(2, PALETTE.red, 0.8);
-            g.lineBetween(px + sz * 0.3, py + sz * 0.2, px + sz * 0.3, py + sz * 0.8);
-            g.fillStyle(PALETTE.red, 0.8);
-            g.fillTriangle(px + sz * 0.3, py + sz * 0.2, px + sz * 0.7, py + sz * 0.35, px + sz * 0.3, py + sz * 0.5);
+            // Detailed flag
+            const flagX = px + sz * 0.3;
+            // Pole
+            g.lineStyle(2, 0x94a3b8, 0.9);
+            g.lineBetween(flagX, py + sz * 0.2, flagX, py + sz * 0.8);
+            // Flag body
+            g.fillStyle(PALETTE.red, 0.9);
+            g.beginPath();
+            g.moveTo(flagX, py + sz * 0.2);
+            g.lineTo(flagX + sz * 0.4, py + sz * 0.3);
+            g.lineTo(flagX, py + sz * 0.5);
+            g.closePath();
+            g.fillPath();
+            // Flag highlight
+            g.fillStyle(0xffffff, 0.2);
+            g.fillTriangle(flagX + 2, py + sz * 0.22, flagX + sz * 0.3, py + sz * 0.3, flagX + 2, py + sz * 0.45);
+            // Base
+            g.fillStyle(0x64748b, 0.6);
+            g.fillRect(flagX - 3, py + sz * 0.78, 6, 3);
           }
         }
       }
@@ -273,18 +355,44 @@ class MinesweeperScene extends Phaser.Scene {
 
     // Explosion particles
     drawParticles(g, this._explosionParticles);
+    drawParticles(g, this.chainExplosionParticles);
+
+    // Confetti
+    drawConfetti(g, this.confettiPieces);
 
     this.instructionsText.setPosition(20, h - 26).setVisible(true);
 
     if (this.gameOver) {
-      g.fillStyle(0x000000, 0.6);
-      g.fillRect(this.ox, this.oy, boardW, boardH);
-      g.lineStyle(2, PALETTE.cyan, 0.3);
-      g.strokeRect(this.ox + 20, this.oy + 20, boardW - 40, boardH - 40);
-      const cx = this.ox + boardW / 2;
-      const cy = this.oy + boardH / 2;
-      this.gameOverText.setPosition(cx, cy - 8).setVisible(true);
-      this.restartHintText.setPosition(cx, cy + 30).setVisible(true);
+      const progress = Math.min(1, this.gameOverTimer / 1.5);
+
+      if (this.gameWon) {
+        // Win screen with celebration
+        g.fillStyle(0x000000, 0.4);
+        g.fillRect(this.ox, this.oy, boardW, boardH);
+
+        g.lineStyle(2, PALETTE.lime, 0.4);
+        g.strokeRect(this.ox + 20, this.oy + 20, boardW - 40, boardH - 40);
+
+        const cx = this.ox + boardW / 2;
+        const cy = this.oy + boardH / 2;
+
+        const textAlpha = Math.min(1, progress * 2);
+        this.gameOverText.setText("¡WIN!").setColor(HEX.lime).setPosition(cx, cy - 8).setVisible(true).setAlpha(textAlpha);
+        this.restartHintText.setPosition(cx, cy + 30).setVisible(true).setAlpha(Math.max(0, (progress - 0.3) * 2));
+      } else {
+        g.fillStyle(0x000000, 0.6);
+        g.fillRect(this.ox, this.oy, boardW, boardH);
+
+        g.lineStyle(2, PALETTE.cyan, 0.3);
+        g.strokeRect(this.ox + 20, this.oy + 20, boardW - 40, boardH - 40);
+
+        const cx = this.ox + boardW / 2;
+        const cy = this.oy + boardH / 2;
+
+        const textAlpha = Math.min(1, (progress - 0.3) * 2);
+        this.gameOverText.setText("GAME OVER").setColor(HEX.cyan).setPosition(cx, cy - 8).setVisible(true).setAlpha(textAlpha);
+        this.restartHintText.setPosition(cx, cy + 30).setVisible(true).setAlpha(Math.max(0, (progress - 0.6) * 2));
+      }
     } else {
       this.gameOverText.setVisible(false);
       this.restartHintText.setVisible(false);

@@ -5,12 +5,18 @@ import { fadeInScene, screenShake, scorePop } from "../shared/effects";
 import {
   GradientBackground, drawSpriteBox, drawSpriteCircle, drawPanel, drawTileGrid,
 } from "../shared/backgrounds";
+import { sfxPickup, sfxGameOver, resumeAudio } from "../shared/sound";
 
 const GRID_W = 25;
 const GRID_H = 25;
 const MIN_CELL = 12;
 
 interface Point { x: number; y: number; }
+
+interface EatParticle {
+  x: number; y: number; vx: number; vy: number;
+  color: number; size: number; life: number; maxLife: number;
+}
 
 class SnakeScene extends Phaser.Scene {
   private snake: Point[] = [];
@@ -19,6 +25,7 @@ class SnakeScene extends Phaser.Scene {
   private nextDirection = { x: 1, y: 0 };
   private score = 0;
   private gameOver = false;
+  private gameOverTimer = 0;
   private paused = false;
   private speed = 0.15;
   private tickTimer = 0;
@@ -33,7 +40,11 @@ class SnakeScene extends Phaser.Scene {
   private oy = 0;
   private cell = 20;
   private foodPulse = 0;
+  private foodRotation = 0;
   private snakeTrail: { x: number; y: number; life: number; }[] = [];
+  private eatParticles: EatParticle[] = [];
+  private blinkTimer = 0;
+  private disintegrateParticles: { x: number; y: number; vx: number; vy: number; color: number; size: number; life: number; maxLife: number; }[] = [];
 
   constructor() { super("Snake"); }
 
@@ -76,9 +87,14 @@ class SnakeScene extends Phaser.Scene {
     this.nextDirection = { x: 1, y: 0 };
     this.score = 0;
     this.gameOver = false;
+    this.gameOverTimer = 0;
     this.paused = false;
     this.speed = 0.15;
     this.snakeTrail = [];
+    this.eatParticles = [];
+    this.disintegrateParticles = [];
+    this.blinkTimer = 0;
+    this.foodRotation = 0;
     this.spawnFood();
     this.scoreText.setText(String(this.score));
     this.draw();
@@ -118,22 +134,81 @@ class SnakeScene extends Phaser.Scene {
       const fy = this.oy + this.food.y * this.cell + this.cell / 2;
       this.spawnFood();
       this.scoreText.setText(String(this.score));
+      sfxPickup();
       scorePop(this, fx, fy, "+10", HEX.lime);
+
+      // Eat particles
+      for (let i = 0; i < 8; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 40 + Math.random() * 60;
+        this.eatParticles.push({
+          x: fx, y: fy,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          color: PALETTE.red,
+          size: 2 + Math.random() * 3,
+          life: 0.4 + Math.random() * 0.3,
+          maxLife: 0.7,
+        });
+      }
     } else {
       const tail = this.snake.pop()!;
       this.snakeTrail.push({ x: tail.x, y: tail.y, life: 0.3 });
     }
     if (this.gameOver) {
       screenShake(this, 0.005, 250);
+      sfxGameOver();
+      this.gameOverTimer = 0;
+      // Disintegration particles
+      for (const seg of this.snake) {
+        for (let i = 0; i < 3; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 30 + Math.random() * 80;
+          this.disintegrateParticles.push({
+            x: this.ox + seg.x * this.cell + this.cell / 2,
+            y: this.oy + seg.y * this.cell + this.cell / 2,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            color: PALETTE.lime,
+            size: 2 + Math.random() * 4,
+            life: 0.5 + Math.random() * 0.5,
+            maxLife: 1.0,
+          });
+        }
+      }
     }
   }
 
   override update(_t: number, delta: number) {
-    if (this.gameOver || this.paused) return;
+    if (this.gameOver) {
+      this.gameOverTimer += delta / 1000;
+      this.blinkTimer += delta / 1000;
+      // Update disintegrate particles
+      for (const p of this.disintegrateParticles) {
+        p.x += p.vx * delta / 1000;
+        p.y += p.vy * delta / 1000;
+        p.vy += 100 * delta / 1000;
+        p.life -= delta / 1000;
+      }
+      this.disintegrateParticles = this.disintegrateParticles.filter((p) => p.life > 0);
+      this.draw();
+      return;
+    }
+    if (this.paused) return;
     this.foodPulse += delta / 1000;
+    this.foodRotation += delta / 1000 * 2;
+    this.blinkTimer += delta / 1000;
     this.tickTimer += delta / 1000;
     for (const t of this.snakeTrail) t.life -= delta / 1000;
     this.snakeTrail = this.snakeTrail.filter((t) => t.life > 0);
+    // Update eat particles
+    for (const p of this.eatParticles) {
+      p.x += p.vx * delta / 1000;
+      p.y += p.vy * delta / 1000;
+      p.vy += 100 * delta / 1000;
+      p.life -= delta / 1000;
+    }
+    this.eatParticles = this.eatParticles.filter((p) => p.life > 0);
     if (this.tickTimer >= this.speed) {
       this.tickTimer = 0;
       this.move();
@@ -177,6 +252,13 @@ class SnakeScene extends Phaser.Scene {
       g.fillCircle(this.ox + t.x * this.cell + this.cell / 2, this.oy + t.y * this.cell + this.cell / 2, this.cell * 0.2 * t.life);
     }
 
+    // Eat particles
+    for (const p of this.eatParticles) {
+      const alpha = Phaser.Math.Clamp(p.life / p.maxLife, 0, 1);
+      g.fillStyle(p.color, alpha * 0.7);
+      g.fillCircle(p.x, p.y, p.size * alpha);
+    }
+
     // Snake body segments (tail to head)
     for (let i = this.snake.length - 1; i >= 0; i--) {
       const p = this.snake[i];
@@ -192,7 +274,8 @@ class SnakeScene extends Phaser.Scene {
       const colorInt = Phaser.Display.Color.GetColor(color.r, color.g, color.b);
 
       if (i === 0) {
-        // Head with eyes
+        // Head with eyes (blinking)
+        const isBlinking = Math.sin(this.blinkTimer * 2) > 0.95;
         drawSpriteBox(g, px, py, sz, sz, {
           fillColor: colorInt,
           outline: { color: 0x166534, width: 2 },
@@ -200,13 +283,15 @@ class SnakeScene extends Phaser.Scene {
           shadow: { offset: 2, alpha: 0.2 },
           cornerRadius: 6,
         });
-        // Eyes
-        g.fillStyle(0xffffff, 0.9);
-        g.fillCircle(px + sz * 0.3, py + sz * 0.3, sz * 0.12);
-        g.fillCircle(px + sz * 0.7, py + sz * 0.3, sz * 0.12);
-        g.fillStyle(0x000000, 0.8);
-        g.fillCircle(px + sz * 0.3, py + sz * 0.3, sz * 0.06);
-        g.fillCircle(px + sz * 0.7, py + sz * 0.3, sz * 0.06);
+        if (!isBlinking) {
+          // Eyes
+          g.fillStyle(0xffffff, 0.9);
+          g.fillCircle(px + sz * 0.3, py + sz * 0.3, sz * 0.12);
+          g.fillCircle(px + sz * 0.7, py + sz * 0.3, sz * 0.12);
+          g.fillStyle(0x000000, 0.8);
+          g.fillCircle(px + sz * 0.3, py + sz * 0.3, sz * 0.06);
+          g.fillCircle(px + sz * 0.7, py + sz * 0.3, sz * 0.06);
+        }
         // Tongue
         g.lineStyle(1, PALETTE.red, 0.6);
         const tongueDir = this.direction;
@@ -228,7 +313,7 @@ class SnakeScene extends Phaser.Scene {
       }
     }
 
-    // Food with pulse glow
+    // Food with pulse glow and rotation
     const fp = this.foodPulse;
     const foodGlow = 0.1 + Math.sin(fp * 4) * 0.08;
     const foodScale = 1 + Math.sin(fp * 3) * 0.08;
@@ -249,15 +334,30 @@ class SnakeScene extends Phaser.Scene {
 
     this.instructionsText.setPosition(20, h - 26).setVisible(true);
 
+    // Game over with disintegration
     if (this.gameOver) {
-      g.fillStyle(0x000000, 0.6);
+      const progress = Math.min(1, this.gameOverTimer / 1.5);
+
+      // Disintegration particles
+      for (const p of this.disintegrateParticles) {
+        const alpha = Phaser.Math.Clamp(p.life / p.maxLife, 0, 1);
+        g.fillStyle(p.color, alpha);
+        g.fillCircle(p.x, p.y, p.size * alpha);
+      }
+
+      const alpha = Math.min(0.6, progress * 1.5);
+      g.fillStyle(0x000000, alpha);
       g.fillRect(this.ox, this.oy, boardW, boardH);
+
       g.lineStyle(2, PALETTE.cyan, 0.3);
       g.strokeRect(this.ox + 20, this.oy + 20, boardW - 40, boardH - 40);
+
       const cx = this.ox + boardW / 2;
       const cy = this.oy + boardH / 2;
-      this.gameOverText.setPosition(cx, cy - 8).setVisible(true);
-      this.restartHintText.setPosition(cx, cy + 30).setVisible(true);
+
+      const textAlpha = Math.min(1, (progress - 0.3) * 2);
+      this.gameOverText.setPosition(cx, cy - 8).setVisible(true).setAlpha(textAlpha);
+      this.restartHintText.setPosition(cx, cy + 30).setVisible(true).setAlpha(Math.max(0, (progress - 0.6) * 2));
     } else {
       this.gameOverText.setVisible(false);
       this.restartHintText.setVisible(false);
