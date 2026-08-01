@@ -6,6 +6,7 @@ import {
   GradientBackground, drawSpriteBox, drawSpriteCircle, drawPanel, drawTileGrid,
 } from "../shared/backgrounds";
 import { sfxPickup, sfxGameOver, resumeAudio } from "../shared/sound";
+import { TouchControlsManager, responsiveFontSize } from "../shared/touchControls";
 
 const GRID_W = 25;
 const GRID_H = 25;
@@ -45,6 +46,7 @@ class SnakeScene extends Phaser.Scene {
   private eatParticles: EatParticle[] = [];
   private blinkTimer = 0;
   private disintegrateParticles: { x: number; y: number; vx: number; vy: number; color: number; size: number; life: number; maxLife: number; }[] = [];
+  private touchControls!: TouchControlsManager;
 
   constructor() { super("Snake"); }
 
@@ -72,6 +74,7 @@ class SnakeScene extends Phaser.Scene {
     this.input.keyboard?.on("keydown", this.handleKey, this);
     this.scale.on("resize", this.draw, this);
     this.events.on('shutdown', this.onShutdown, this);
+    this.touchControls = new TouchControlsManager(this, "Snake");
     this.reset();
     fadeInScene(this, 300);
   }
@@ -79,6 +82,7 @@ class SnakeScene extends Phaser.Scene {
   private onShutdown() {
     this.input.keyboard?.off("keydown", this.handleKey, this);
     this.scale.off("resize", this.draw, this);
+    this.touchControls?.destroy();
   }
 
   private reset() {
@@ -195,6 +199,15 @@ class SnakeScene extends Phaser.Scene {
       return;
     }
     if (this.paused) return;
+    this.touchControls?.update();
+
+    // Touch input
+    if (this.touchControls?.state.up && this.direction.y === 0) this.nextDirection = { x: 0, y: -1 };
+    if (this.touchControls?.state.down && this.direction.y === 0) this.nextDirection = { x: 0, y: 1 };
+    if (this.touchControls?.state.left && this.direction.x === 0) this.nextDirection = { x: -1, y: 0 };
+    if (this.touchControls?.state.right && this.direction.x === 0) this.nextDirection = { x: 1, y: 0 };
+    if (this.touchControls?.state.pause) this.paused = !this.paused;
+
     this.foodPulse += delta / 1000;
     this.foodRotation += delta / 1000 * 2;
     this.blinkTimer += delta / 1000;
@@ -333,6 +346,9 @@ class SnakeScene extends Phaser.Scene {
     g.fillCircle(fx - foodR * 0.2, fy - foodR * 0.2, foodR * 0.25);
 
     this.instructionsText.setPosition(20, h - 26).setVisible(true);
+
+    // Touch controls overlay
+    this.touchControls?.draw(g);
 
     // Game over with disintegration
     if (this.gameOver) {

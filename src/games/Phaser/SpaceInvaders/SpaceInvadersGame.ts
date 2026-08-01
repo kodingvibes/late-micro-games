@@ -8,6 +8,7 @@ import {
   drawSpriteBox, drawSpriteCircle, drawSpriteTriangle, drawPanel,
 } from "../shared/backgrounds";
 import { sfxShoot, sfxExplosion, sfxHit, sfxGameOver, resumeAudio } from "../shared/sound";
+import { TouchControlsManager, responsiveFontSize } from "../shared/touchControls";
 
 const ROWS = 5;
 const COLS = 8;
@@ -52,6 +53,7 @@ class SpaceInvadersScene extends Phaser.Scene {
   private engineGlowPulse = 0;
   private bulletParticles: { x: number; y: number; life: number; color: number; }[] = [];
   private gameOverParticles: { x: number; y: number; life: number; maxLife: number; color: number; size: number; vx: number; vy: number; }[] = [];
+  private touchControls!: TouchControlsManager;
 
   constructor() { super("SpaceInvaders"); }
 
@@ -85,6 +87,7 @@ class SpaceInvadersScene extends Phaser.Scene {
     this.input.keyboard?.addCapture(["SPACE", "LEFT", "RIGHT", "UP", "DOWN", "A", "D", "W", "S", "P", "R"]);
     this.scale.on("resize", this.draw, this);
     this.events.on('shutdown', this.onShutdown, this);
+    this.touchControls = new TouchControlsManager(this, "SpaceInvaders");
     this.reset();
     fadeInScene(this, 300);
   }
@@ -92,6 +95,7 @@ class SpaceInvadersScene extends Phaser.Scene {
   private onShutdown() {
     this.input.keyboard?.off("keydown", this.handleKey, this);
     this.scale.off("resize", this.draw, this);
+    this.touchControls?.destroy();
   }
 
   private reset() {
@@ -164,10 +168,23 @@ class SpaceInvadersScene extends Phaser.Scene {
     if (this.paused) return;
     const dt = delta / 1000;
     this.layout();
-    const left = this.keyLeft.isDown || this.keyA.isDown;
-    const right = this.keyRight.isDown || this.keyD.isDown;
+    this.touchControls?.update();
+    const left = this.keyLeft.isDown || this.keyA.isDown || this.touchControls?.state.left;
+    const right = this.keyRight.isDown || this.keyD.isDown || this.touchControls?.state.right;
     if (left) this.playerX -= 300 * this.scale_ * dt;
     if (right) this.playerX += 300 * this.scale_ * dt;
+
+    // Touch fire
+    if (this.touchControls?.state.fire) {
+      resumeAudio();
+      sfxShoot();
+      this.bullets.push({ x: this.playerX + this.playerW / 2, y: this.playH - 30 * this.scale_ });
+    }
+
+    // Touch pause
+    if (this.touchControls?.state.pause) {
+      this.paused = !this.paused;
+    }
     this.playerX = Phaser.Math.Clamp(this.playerX, 0, this.playW - this.playerW);
 
     // Engine glow pulse
@@ -278,8 +295,9 @@ class SpaceInvadersScene extends Phaser.Scene {
     updateStarField(this.stars, 0.016, 20, w, h);
     drawStarField(g, this.stars);
 
-    // Instructions
-    this.instructionsText.setPosition(20, h - 26).setVisible(true);
+    // Instructions (responsive)
+    const instrSize = responsiveFontSize(13, w, h, 9, 16);
+    this.instructionsText.setPosition(20, h - 26).setVisible(true).setFontSize(instrSize);
 
     // Play area panel
     drawPanel(g, this.ox - 8, this.oy - 8, this.playW + 16, this.playH + 16, {
@@ -461,6 +479,9 @@ class SpaceInvadersScene extends Phaser.Scene {
       this.gameOverText.setVisible(false);
       this.restartHintText.setVisible(false);
     }
+
+    // Touch controls overlay
+    this.touchControls?.draw(g);
   }
 }
 

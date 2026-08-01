@@ -7,6 +7,7 @@ import {
   spawnConfetti, updateConfetti, drawConfetti,
 } from "../shared/backgrounds";
 import { sfxMerge, sfxGameOver, sfxWin, resumeAudio } from "../shared/sound";
+import { TouchControlsManager, responsiveFontSize } from "../shared/touchControls";
 
 const SIZE = 4;
 const TILE_COLORS: Record<number, { bg: number; text: string; dark: number }> = {
@@ -51,6 +52,7 @@ class Twenty48Scene extends Phaser.Scene {
   private mergeAnimations: { x: number; y: number; value: number; scale: number; alpha: number; timer: number; }[] = [];
   private confettiPieces: any[] = [];
   private bgPatternOffset = 0;
+  private touchControls!: TouchControlsManager;
 
   constructor() { super("Twenty48"); }
 
@@ -79,6 +81,7 @@ class Twenty48Scene extends Phaser.Scene {
     this.input.keyboard?.on("keydown", this.handleKey, this);
     this.scale.on("resize", this.draw, this);
     this.events.on('shutdown', this.onShutdown, this);
+    this.touchControls = new TouchControlsManager(this, "Twenty48");
     this.reset();
     fadeInScene(this, 300);
   }
@@ -86,6 +89,7 @@ class Twenty48Scene extends Phaser.Scene {
   private onShutdown() {
     this.input.keyboard?.off("keydown", this.handleKey, this);
     this.scale.off("resize", this.draw, this);
+    this.touchControls?.destroy();
   }
 
   private reset() {
@@ -262,6 +266,15 @@ class Twenty48Scene extends Phaser.Scene {
   }
 
   override update(_t: number, delta: number) {
+    this.touchControls?.update();
+
+    // Touch input
+    if (this.touchControls?.state.left) { this.moveLeft(); }
+    if (this.touchControls?.state.right) { this.moveRight(); }
+    if (this.touchControls?.state.up) { this.moveUp(); }
+    if (this.touchControls?.state.down) { this.moveDown(); }
+    if (this.touchControls?.state.pause) { return; }
+
     this.bgPatternOffset += delta / 1000 * 10;
 
     // Animate spawning tiles (bounce effect)
@@ -415,6 +428,9 @@ class Twenty48Scene extends Phaser.Scene {
     drawConfetti(g, this.confettiPieces);
 
     this.instructionsText.setPosition(20, h - 26).setVisible(true);
+
+    // Touch controls overlay
+    this.touchControls?.draw(g);
 
     if (this.gameOver) {
       const progress = Math.min(1, this.gameOverTimer / 1.5);

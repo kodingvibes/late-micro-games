@@ -8,6 +8,7 @@ import {
   spawnConfetti, updateConfetti, drawConfetti,
 } from "../shared/backgrounds";
 import { sfxExplosion, sfxFlag, sfxReveal, sfxWin, sfxGameOver, resumeAudio } from "../shared/sound";
+import { TouchControlsManager, responsiveFontSize } from "../shared/touchControls";
 
 const COLS = 10;
 const ROWS = 10;
@@ -39,6 +40,8 @@ class MinesweeperScene extends Phaser.Scene {
   private flagCount = 0;
   private chainExplosionParticles: any[] = [];
   private confettiPieces: any[] = [];
+  private touchControls!: TouchControlsManager;
+  private flagMode = false;
 
   constructor() { super("Minesweeper"); }
 
@@ -68,6 +71,7 @@ class MinesweeperScene extends Phaser.Scene {
     this.input.on("pointerdown", this.handleClick, this);
     this.scale.on("resize", this.draw, this);
     this.events.on('shutdown', this.onShutdown, this);
+    this.touchControls = new TouchControlsManager(this, "Minesweeper");
     this.reset();
     fadeInScene(this, 300);
   }
@@ -76,6 +80,7 @@ class MinesweeperScene extends Phaser.Scene {
     this.input.keyboard?.off("keydown", this.handleKey, this);
     this.input.off("pointerdown", this.handleClick, this);
     this.scale.off("resize", this.draw, this);
+    this.touchControls?.destroy();
   }
 
   private reset() {
@@ -171,13 +176,14 @@ class MinesweeperScene extends Phaser.Scene {
     const y = Math.floor((pointer.y - this.oy) / this.cellSize);
     if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return;
 
-    if (pointer.rightButtonDown()) {
+    if (pointer.rightButtonDown() || this.flagMode) {
       const c = this.cells[y][x];
       if (c.revealed) return;
       c.flagged = !c.flagged;
       this.flagCount += c.flagged ? 1 : -1;
       this.minesText.setText(String(MINES - this.flagCount));
       sfxFlag();
+      this.flagMode = false; // toggle off after one flag
       this.draw();
       return;
     }
@@ -209,6 +215,13 @@ class MinesweeperScene extends Phaser.Scene {
   }
 
   override update(_t: number, delta: number) {
+    this.touchControls?.update();
+
+    // Touch flag toggle
+    if (this.touchControls?.state.flag) {
+      this.flagMode = !this.flagMode;
+    }
+
     if (this.gameOver) {
       this.gameOverTimer += delta / 1000;
       if (this._explosionParticles.length > 0) {
@@ -361,6 +374,9 @@ class MinesweeperScene extends Phaser.Scene {
     drawConfetti(g, this.confettiPieces);
 
     this.instructionsText.setPosition(20, h - 26).setVisible(true);
+
+    // Touch controls overlay
+    this.touchControls?.draw(g);
 
     if (this.gameOver) {
       const progress = Math.min(1, this.gameOverTimer / 1.5);

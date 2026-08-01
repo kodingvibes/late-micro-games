@@ -6,6 +6,7 @@ import {
   GradientBackground, drawSpriteBox, drawPanel, drawTileGrid,
 } from "../shared/backgrounds";
 import { sfxLineClear, sfxMove, sfxRotate, sfxDrop, sfxGameOver, resumeAudio } from "../shared/sound";
+import { TouchControlsManager, responsiveFontSize } from "../shared/touchControls";
 
 const COLS = 10;
 const ROWS = 20;
@@ -54,6 +55,7 @@ class TetrisScene extends Phaser.Scene {
   private lineClearParticles: LineClearParticle[] = [];
   private cascadeRows: number[] = [];
   private cascadeTimer = 0;
+  private touchControls!: TouchControlsManager;
 
   constructor() { super("Tetris"); }
 
@@ -95,6 +97,7 @@ class TetrisScene extends Phaser.Scene {
     this.input.keyboard?.on("keydown", this.handleKey, this);
     this.scale.on("resize", this.draw, this);
     this.events.on('shutdown', this.onShutdown, this);
+    this.touchControls = new TouchControlsManager(this, "Tetris");
     this.draw();
     fadeInScene(this, 300);
   }
@@ -102,6 +105,7 @@ class TetrisScene extends Phaser.Scene {
   private onShutdown() {
     this.input.keyboard?.off("keydown", this.handleKey, this);
     this.scale.off("resize", this.draw, this);
+    this.touchControls?.destroy();
   }
 
   private spawnPiece() {
@@ -256,6 +260,38 @@ class TetrisScene extends Phaser.Scene {
       return;
     }
     if (this.paused) return;
+    this.touchControls?.update();
+
+    // Touch input handling
+    if (this.touchControls?.state.left) {
+      if (this.valid(this.current.shape, this.current.x - 1, this.current.y)) {
+        this.current.x--;
+        sfxMove();
+      }
+    }
+    if (this.touchControls?.state.right) {
+      if (this.valid(this.current.shape, this.current.x + 1, this.current.y)) {
+        this.current.x++;
+        sfxMove();
+      }
+    }
+    if (this.touchControls?.state.rotate) {
+      this.rotate();
+      sfxRotate();
+    }
+    if (this.touchControls?.state.drop) {
+      while (this.valid(this.current.shape, this.current.x, this.current.y + 1)) {
+        this.current.y++;
+        this.score += 2;
+      }
+      sfxDrop();
+      this.lock();
+    }
+    if (this.touchControls?.state.pause) {
+      this.paused = !this.paused;
+      this.statusText.setText(this.paused ? "PAUSA" : "");
+    }
+
     this.dropTimer += delta / 1000;
     if (this.dropTimer >= this.dropDelay) {
       this.dropTimer = 0;
@@ -386,7 +422,11 @@ class TetrisScene extends Phaser.Scene {
       }
     }
 
-    this.instructionsText.setPosition(20, h - 26).setVisible(true);
+    const instrSize = responsiveFontSize(13, w, h, 9, 16);
+    this.instructionsText.setPosition(20, h - 26).setVisible(true).setFontSize(instrSize);
+
+    // Touch controls overlay
+    this.touchControls?.draw(g);
 
     // Game over with cascade animation
     if (this.gameOver) {

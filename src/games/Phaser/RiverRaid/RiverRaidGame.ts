@@ -10,6 +10,7 @@ import {
   drawSpriteBox, drawSpriteCircle, drawSpriteTriangle, drawPanel, drawProgressBar,
 } from "../shared/backgrounds";
 import { sfxShoot, sfxExplosion, sfxPickup, sfxGameOver, resumeAudio } from "../shared/sound";
+import { TouchControlsManager, responsiveFontSize } from "../shared/touchControls";
 
 const RIVER_W_MIN = 180;
 const RIVER_W_MAX = 360;
@@ -70,6 +71,7 @@ class RiverRaidScene extends Phaser.Scene {
   private engineGlowPulse = 0;
   private gameOverZoom = 0;
   private gameOverParticles: Particle[] = [];
+  private touchControls!: TouchControlsManager;
 
   constructor() { super("RiverRaid"); }
 
@@ -117,6 +119,7 @@ class RiverRaidScene extends Phaser.Scene {
     this.input.keyboard?.on("keydown", this.handleKey, this);
     this.scale.on("resize", this.draw, this);
     this.events.on('shutdown', this.onShutdown, this);
+    this.touchControls = new TouchControlsManager(this, "RiverRaid");
     this.reset();
     fadeInScene(this, 300);
   }
@@ -124,6 +127,7 @@ class RiverRaidScene extends Phaser.Scene {
   private onShutdown() {
     this.input.keyboard?.off("keydown", this.handleKey, this);
     this.scale.off("resize", this.draw, this);
+    this.touchControls?.destroy();
   }
 
   private reset() {
@@ -265,10 +269,25 @@ class RiverRaidScene extends Phaser.Scene {
     this.targetRiverW = RIVER_W_MIN + (RIVER_W_MAX - RIVER_W_MIN) * (0.6 + 0.4 * Math.sin(this.distance / 800));
     this.riverW += (this.targetRiverW - this.riverW) * dt * 0.5;
 
-    const left = this.keyLeft.isDown || this.keyA.isDown;
-    const right = this.keyRight.isDown || this.keyD.isDown;
+    this.touchControls?.update();
+    const left = this.keyLeft.isDown || this.keyA.isDown || this.touchControls?.state.left;
+    const right = this.keyRight.isDown || this.keyD.isDown || this.touchControls?.state.right;
     if (left) this.player.x -= 260 * dt;
     if (right) this.player.x += 260 * dt;
+
+    // Touch fire
+    if (this.touchControls?.state.fire) {
+      resumeAudio();
+      sfxShoot();
+      this.bullets.push({ x: this.player.x, y: this.player.y - 28, alive: true });
+      this.bullets.push({ x: this.player.x - 10, y: this.player.y - 14, alive: true });
+      this.bullets.push({ x: this.player.x + 10, y: this.player.y - 14, alive: true });
+    }
+
+    // Touch pause
+    if (this.touchControls?.state.pause) {
+      this.paused = !this.paused;
+    }
 
     for (const b of this.banks) b.y += move;
     this.banks = this.banks.filter((b) => b.y < h + SEGMENT_H);
@@ -614,7 +633,11 @@ class RiverRaidScene extends Phaser.Scene {
       g.strokeRoundedRect(fuelX - 2, fuelY - 2, fuelW + 4, fuelH + 4, 5);
     }
 
-    this.instructionsText.setPosition(20, h - 26).setVisible(true);
+    const instrSize = responsiveFontSize(13, w, h, 9, 16);
+    this.instructionsText.setPosition(20, h - 26).setVisible(true).setFontSize(instrSize);
+
+    // Touch controls overlay
+    this.touchControls?.draw(g);
 
     // Game over with zoom transition
     if (this.gameOver) {
