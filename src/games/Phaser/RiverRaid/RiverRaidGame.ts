@@ -4,6 +4,10 @@ import { PALETTE, HEX, FONTS } from "../shared/theme";
 import { fadeInScene, screenShake, scorePop } from "../shared/effects";
 import type { Particle } from "../shared/particles";
 import { spawnExplosion, updateParticles, drawParticles } from "../shared/particles";
+import {
+  GradientBackground, createStarField, updateStarField, drawStarField,
+  drawSpriteBox, drawSpriteCircle, drawSpriteTriangle, drawPanel, drawProgressBar,
+} from "../shared/backgrounds";
 
 const RIVER_W_MIN = 180;
 const RIVER_W_MAX = 360;
@@ -19,8 +23,8 @@ interface Enemy {
   alive: boolean;
   oscillate?: number;
   speedX?: number;
+  floatOff?: number;
 }
-
 interface Bullet { x: number; y: number; alive: boolean; }
 
 class RiverRaidScene extends Phaser.Scene {
@@ -56,11 +60,25 @@ class RiverRaidScene extends Phaser.Scene {
   private statsText!: Phaser.GameObjects.Text;
   private restartHintText!: Phaser.GameObjects.Text;
   private fuelLabelText!: Phaser.GameObjects.Text;
+  private bg!: GradientBackground;
+  private stars: { x: number; y: number; size: number; alpha: number; speed: number; }[] = [];
+  private waterTime = 0;
+  private engineParticles: { x: number; y: number; life: number; }[] = [];
 
   constructor() { super("RiverRaid"); }
 
   create() {
     this.graphics = this.add.graphics();
+    this.bg = new GradientBackground(this, {
+      layers: [
+        { speed: 0.005, colors: [0x05070e, 0x0b0d17, 0x0f1220, 0x14162a], height: 0.5 },
+        { speed: 0.02, colors: [0x14162a, 0x1a1d35, 0x1e213a], height: 0.3, y: 0 },
+      ],
+      scanlines: true,
+      vignette: true,
+    });
+    this.stars = createStarField(700, 700, 60);
+
     this.add.text(20, 12, "SCORE", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
     this.scoreText = this.add.text(20, 24, "0", {
       fontSize: "24px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic",
@@ -117,10 +135,12 @@ class RiverRaidScene extends Phaser.Scene {
     this.enemies = [];
     this.bullets = [];
     this.particles = [];
+    this.engineParticles = [];
     this.nextSpawnY = -200;
     this.nextBridgeY = -1200;
     this.gameOver = false;
     this.paused = false;
+    this.waterTime = 0;
     this.generateBanks(0);
     this.draw();
   }
@@ -169,11 +189,6 @@ class RiverRaidScene extends Phaser.Scene {
     return this.banks[0]?.x ?? this.scale.width / 2;
   }
 
-  private isInRiver(x: number, y: number): boolean {
-    const cx = this.bankXAt(y);
-    return Math.abs(x - cx) < this.riverW / 2 - 8;
-  }
-
   private spawnEnemies() {
     const h = this.scale.height;
     if (this.nextSpawnY > -h) return;
@@ -182,13 +197,13 @@ class RiverRaidScene extends Phaser.Scene {
     const half = this.riverW / 2 - 40;
     const typeRoll = Math.random();
     if (typeRoll < 0.15) {
-      this.enemies.push({ x: cx + Phaser.Math.Between(-half, half), y, w: 28, h: 28, type: "fuel", alive: true });
+      this.enemies.push({ x: cx + Phaser.Math.Between(-half, half), y, w: 28, h: 28, type: "fuel", alive: true, floatOff: Math.random() * Math.PI * 2 });
     } else if (typeRoll < 0.45) {
-      this.enemies.push({ x: cx + Phaser.Math.Between(-half, half), y, w: 34, h: 22, type: "boat", alive: true });
+      this.enemies.push({ x: cx + Phaser.Math.Between(-half, half), y, w: 34, h: 22, type: "boat", alive: true, floatOff: Math.random() * Math.PI * 2 });
     } else if (typeRoll < 0.75) {
       this.enemies.push({
         x: cx + Phaser.Math.Between(-half, half), y, w: 36, h: 24,
-        type: "heli", alive: true, oscillate: Math.random() * Math.PI * 2, speedX: 40 + Math.random() * 60,
+        type: "heli", alive: true, oscillate: Math.random() * Math.PI * 2, speedX: 40 + Math.random() * 60, floatOff: Math.random() * Math.PI * 2,
       });
     }
     this.nextSpawnY += Phaser.Math.Between(140, 260);
@@ -205,12 +220,12 @@ class RiverRaidScene extends Phaser.Scene {
 
   private addExplosion(x: number, y: number, color = PALETTE.orange) {
     const newParts = spawnExplosion(this, x, y, {
-      count: 15,
+      count: 20,
       colors: [color, PALETTE.yellow, PALETTE.red, PALETTE.orange],
-      speed: 90,
+      speed: 100,
     });
     this.particles.push(...newParts);
-    screenShake(this, 0.004, 200);
+    screenShake(this, 0.005, 250);
   }
 
   override update(_t: number, delta: number) {
@@ -219,33 +234,33 @@ class RiverRaidScene extends Phaser.Scene {
     const w = this.scale.width;
     const h = this.scale.height;
 
-    // auto scroll
     const move = this.speed * dt;
     this.distance += move / 10;
     this.fuel = Math.max(0, this.fuel - dt * 1.8);
     this.speed = Math.min(380, 160 + this.distance / 250);
+    this.waterTime += dt;
 
-    // river width meander
     this.targetRiverW = RIVER_W_MIN + (RIVER_W_MAX - RIVER_W_MIN) * (0.6 + 0.4 * Math.sin(this.distance / 800));
     this.riverW += (this.targetRiverW - this.riverW) * dt * 0.5;
 
-    // input
     const left = this.keyLeft.isDown || this.keyA.isDown;
     const right = this.keyRight.isDown || this.keyD.isDown;
     if (left) this.player.x -= 260 * dt;
     if (right) this.player.x += 260 * dt;
 
-    // banks
     for (const b of this.banks) b.y += move;
     this.banks = this.banks.filter((b) => b.y < h + SEGMENT_H);
     this.generateBanks(-SEGMENT_H);
 
-    // clamp player to river
     const playerCx = this.bankXAt(this.player.y);
     const half = this.riverW / 2 - PLAYER_W / 2 - 6;
     this.player.x = Phaser.Math.Clamp(this.player.x, playerCx - half, playerCx + half);
 
-    // bullets
+    // Engine particles
+    this.engineParticles.push({ x: this.player.x, y: this.player.y + PLAYER_H / 2, life: 0.4 });
+    for (const p of this.engineParticles) { p.life -= dt; p.y += 30 * dt; }
+    this.engineParticles = this.engineParticles.filter((p) => p.life > 0);
+
     for (const b of this.bullets) {
       if (!b.alive) continue;
       b.y -= 520 * dt;
@@ -253,7 +268,6 @@ class RiverRaidScene extends Phaser.Scene {
     }
     this.bullets = this.bullets.filter((b) => b.alive);
 
-    // enemies
     this.spawnEnemies();
     this.spawnBridge();
     for (const e of this.enemies) {
@@ -268,12 +282,10 @@ class RiverRaidScene extends Phaser.Scene {
       }
     }
 
-    // collisions
     for (const e of this.enemies) {
       if (!e.alive) continue;
       const ew2 = e.w / 2;
       const eh2 = e.h / 2;
-      // player collision
       const dx = this.player.x - e.x;
       const dy = this.player.y - e.y;
       if (Math.abs(dx) < (PLAYER_W / 2 + ew2 - 6) && Math.abs(dy) < (PLAYER_H / 2 + eh2 - 6)) {
@@ -290,7 +302,6 @@ class RiverRaidScene extends Phaser.Scene {
         }
         continue;
       }
-      // bullet collision
       for (const b of this.bullets) {
         if (!b.alive) continue;
         if (Math.abs(b.x - e.x) < ew2 && Math.abs(b.y - e.y) < eh2) {
@@ -312,10 +323,8 @@ class RiverRaidScene extends Phaser.Scene {
     }
     this.enemies = this.enemies.filter((e) => e.y < h + 80);
 
-    // particles
     this.particles = updateParticles(this.particles, dt, this.speed * 0.4);
 
-    // fuel empty
     if (this.fuel <= 0) {
       this.lives--;
       this.fuel = 50;
@@ -333,16 +342,25 @@ class RiverRaidScene extends Phaser.Scene {
     const w = this.scale.width;
     const h = this.scale.height;
 
-    g.fillStyle(PALETTE.bg, 1);
-    g.fillRect(0, 0, w, h);
+    // Background with stars
+    this.bg.draw(g, w, h);
+    updateStarField(this.stars, 0.016, 5, w, h);
+    drawStarField(g, this.stars);
 
-    // water lane stripes (subtle motion)
-    g.fillStyle(PALETTE.surface, 1);
-    for (let y = Math.floor(-this.distance) % 120 - 120; y < h; y += 120) {
-      g.fillRect(0, y, w, 60);
+    // Mountains silhouette (parallax layer 2)
+    const mountOffset = (this.distance * 0.1) % 400;
+    g.fillStyle(0x0d0f1e, 0.6);
+    g.beginPath();
+    g.moveTo(0, h);
+    for (let x = 0; x <= w; x += 20) {
+      const mh = 60 + Math.sin((x + mountOffset) / 80) * 30 + Math.sin((x + mountOffset) / 40) * 15;
+      g.lineTo(x, h - mh);
     }
+    g.lineTo(w, h);
+    g.closePath();
+    g.fillPath();
 
-    // banks (solid surface terrain)
+    // Water surface with wave texture
     if (this.banks.length > 1) {
       const left: [number, number][] = [];
       const right: [number, number][] = [];
@@ -350,6 +368,34 @@ class RiverRaidScene extends Phaser.Scene {
         left.push([p.x - this.riverW / 2, p.y]);
         right.push([p.x + this.riverW / 2, p.y]);
       }
+
+      // River water fill
+      g.fillStyle(0x0a0d1a, 0.8);
+      g.beginPath();
+      g.moveTo(left[0][0], left[0][1]);
+      for (const [x, y] of left) g.lineTo(x, y);
+      for (let i = right.length - 1; i >= 0; i--) g.lineTo(right[i][0], right[i][1]);
+      g.closePath();
+      g.fillPath();
+
+      // Water wave lines
+      g.lineStyle(1, PALETTE.cyan, 0.08);
+      for (let y = -SEGMENT_H; y < h + SEGMENT_H; y += 12) {
+        const cx = this.bankXAt(y);
+        const halfW = this.riverW / 2 - 10;
+        const waveX = Math.sin((y + this.waterTime * 60) / 30) * 8;
+        g.lineBetween(cx - halfW + waveX, y, cx + halfW + waveX, y);
+      }
+
+      // Water surface shimmer
+      g.fillStyle(0xffffff, 0.03);
+      for (let i = 0; i < 5; i++) {
+        const sy = (this.waterTime * 40 + i * 80) % h;
+        const cx = this.bankXAt(sy);
+        g.fillRect(cx - 20, sy, 40, 2);
+      }
+
+      // Bank terrain (left)
       g.fillStyle(PALETTE.surfaceLight, 1);
       g.beginPath();
       g.moveTo(0, h);
@@ -358,6 +404,7 @@ class RiverRaidScene extends Phaser.Scene {
       g.closePath();
       g.fillPath();
 
+      // Bank terrain (right)
       g.beginPath();
       g.moveTo(w, h);
       for (const [x, y] of right) g.lineTo(x, y);
@@ -365,101 +412,186 @@ class RiverRaidScene extends Phaser.Scene {
       g.closePath();
       g.fillPath();
 
-      // bank inner neon edge
-      g.lineStyle(3, PALETTE.accent, 0.35);
+      // Bank edge with glow
+      g.lineStyle(3, PALETTE.accent, 0.3);
       g.beginPath();
       for (const [x, y] of left) g.lineTo(x, y);
       g.strokePath();
-      g.lineStyle(3, PALETTE.accent, 0.35);
+      g.beginPath();
+      for (const [x, y] of right) g.lineTo(x, y);
+      g.strokePath();
+
+      // Bank edge inner bright line
+      g.lineStyle(1, PALETTE.cyan, 0.15);
+      g.beginPath();
+      for (const [x, y] of left) g.lineTo(x, y);
+      g.strokePath();
       g.beginPath();
       for (const [x, y] of right) g.lineTo(x, y);
       g.strokePath();
     }
 
-    // enemies
+    // Enemies
     for (const e of this.enemies) {
+      const floatY = e.floatOff ? Math.sin(this.waterTime * 3 + e.floatOff) * 2 : 0;
+      const ey = e.y + floatY;
+
       if (e.type === "bridge") {
-        g.fillStyle(PALETTE.surfaceLight, 1);
-        g.fillRoundedRect(e.x - e.w / 2, e.y - e.h / 2, e.w, e.h, 4);
-        g.fillStyle(PALETTE.border, 1);
+        // Bridge with rivets
+        drawSpriteBox(g, e.x - e.w / 2, ey - e.h / 2, e.w, e.h, {
+          fillColor: PALETTE.surfaceLight,
+          outline: { color: PALETTE.border, width: 2 },
+          highlight: { x: 0.1, y: 0.1, size: 0.2, alpha: 0.2 },
+          shadow: { offset: 2, alpha: 0.2 },
+          cornerRadius: 3,
+        });
+        // Rivets
+        g.fillStyle(PALETTE.border, 0.6);
         for (let i = -e.w / 2 + 20; i < e.w / 2; i += 40) {
-          g.fillRect(e.x + i - 3, e.y - e.h / 2, 6, e.h);
+          g.fillCircle(e.x + i, ey - e.h / 4, 2);
+          g.fillCircle(e.x + i, ey + e.h / 4, 2);
         }
+        // Bridge supports
+        g.fillStyle(PALETTE.surface, 0.8);
+        g.fillRect(e.x - e.w / 2 - 4, ey - e.h / 2, 4, e.h);
+        g.fillRect(e.x + e.w / 2, ey - e.h / 2, 4, e.h);
       } else if (e.type === "fuel") {
-        g.fillStyle(PALETTE.yellow, 0.25);
-        g.fillCircle(e.x, e.y, e.w * 0.6);
-        g.fillStyle(PALETTE.yellow, 1);
-        g.fillRoundedRect(e.x - e.w / 2, e.y - e.h / 2, e.w, e.h, 6);
-        const fuelLabel = this.add.text(e.x, e.y, "F", { fontSize: "14px", color: HEX.bg, fontFamily: "'Inter', sans-serif", fontStyle: "bold" }).setOrigin(0.5);
+        // Fuel can with glow
+        g.fillStyle(PALETTE.yellow, 0.12);
+        g.fillCircle(e.x, ey, e.w * 0.7);
+        drawSpriteBox(g, e.x - e.w / 2, ey - e.h / 2, e.w, e.h, {
+          fillColor: PALETTE.yellow,
+          outline: { color: 0x854d0e, width: 2 },
+          highlight: { x: 0.3, y: 0.2, size: 0.3, alpha: 0.5 },
+          shadow: { offset: 2, alpha: 0.2 },
+          cornerRadius: 6,
+        });
+        // Fuel label
+        g.fillStyle(0x000000, 0.5);
+        g.fillRect(e.x - 6, ey - 5, 12, 10);
+        const fuelLabel = this.add.text(e.x, ey, "F", { fontSize: "12px", color: HEX.yellow, fontFamily: "'Inter', sans-serif", fontStyle: "bold" }).setOrigin(0.5);
         this.overlay.add(fuelLabel);
       } else if (e.type === "boat") {
-        g.fillStyle(PALETTE.accent, 0.25);
-        g.fillRoundedRect(e.x - e.w / 2 - 4, e.y - e.h / 2 - 4, e.w + 8, e.h + 8, 6);
-        g.fillStyle(PALETTE.accentSoft, 1);
-        g.fillRoundedRect(e.x - e.w / 2, e.y - e.h / 2, e.w, e.h, 5);
+        // Boat with cabin
+        drawSpriteBox(g, e.x - e.w / 2, ey - e.h / 2, e.w, e.h, {
+          fillColor: PALETTE.accentSoft,
+          outline: { color: 0x3730a3, width: 2 },
+          highlight: { x: 0.2, y: 0.2, size: 0.3, alpha: 0.4 },
+          shadow: { offset: 2, alpha: 0.2 },
+          cornerRadius: 4,
+        });
+        // Cabin
+        g.fillStyle(PALETTE.surfaceLight, 0.8);
+        g.fillRect(e.x - 6, ey - e.h / 2 - 6, 12, 8);
+        // Chimney smoke
+        g.fillStyle(0x94a3b8, 0.3);
+        g.fillCircle(e.x, ey - e.h / 2 - 8, 3);
+        g.fillStyle(0x94a3b8, 0.15);
+        g.fillCircle(e.x + 2, ey - e.h / 2 - 12, 4);
       } else if (e.type === "heli") {
-        g.fillStyle(PALETTE.red, 0.25);
-        g.fillCircle(e.x, e.y, e.w * 0.7);
-        g.fillStyle(PALETTE.red, 1);
-        g.fillRoundedRect(e.x - e.w / 2, e.y - e.h / 2, e.w, e.h, 5);
-        g.fillStyle(PALETTE.surfaceLight, 1);
-        g.fillRect(e.x - e.w * 0.7, e.y - 2, e.w * 1.4, 4);
+        // Helicopter body
+        drawSpriteBox(g, e.x - e.w / 2, ey - e.h / 2, e.w, e.h, {
+          fillColor: PALETTE.red,
+          outline: { color: 0x991b1b, width: 2 },
+          highlight: { x: 0.2, y: 0.2, size: 0.3, alpha: 0.4 },
+          shadow: { offset: 2, alpha: 0.2 },
+          cornerRadius: 5,
+        });
+        // Cockpit
+        g.fillStyle(PALETTE.cyan, 0.3);
+        g.fillCircle(e.x, ey - 2, 5);
+        // Rotor blades
+        const rotorAngle = this.waterTime * 20;
+        g.lineStyle(2, PALETTE.surfaceLight, 0.8);
+        g.lineBetween(e.x - e.w * 0.7, ey - e.h / 2, e.x + e.w * 0.7, ey - e.h / 2);
+        g.lineBetween(e.x, ey - e.h / 2 - e.w * 0.3, e.x, ey - e.h / 2 + e.w * 0.3);
+        // Rotor blur
+        g.fillStyle(0xffffff, 0.08);
+        g.fillCircle(e.x, ey - e.h / 2, e.w * 0.5);
+        // Tail
+        g.fillStyle(PALETTE.red, 0.6);
+        g.fillRect(e.x + e.w / 2, ey - 2, 8, 4);
       }
     }
 
-    // bullets
+    // Bullets with glow
     for (const b of this.bullets) {
-      g.fillStyle(PALETTE.yellow, 1);
+      g.fillStyle(PALETTE.yellow, 0.2);
+      g.fillCircle(b.x, b.y, 6);
+      g.fillStyle(PALETTE.yellow, 0.6);
       g.fillCircle(b.x, b.y, 3);
-      g.fillStyle(PALETTE.yellow, 0.35);
-      g.fillCircle(b.x, b.y + 8, 5);
+      g.fillStyle(0xffffff, 0.9);
+      g.fillCircle(b.x, b.y, 1.5);
     }
 
-    // particles
+    // Particles
     drawParticles(g, this.particles);
 
-    // player jet
+    // Engine exhaust particles
+    for (const p of this.engineParticles) {
+      g.fillStyle(PALETTE.cyan, p.life * 0.4);
+      g.fillCircle(p.x, p.y, 3 * p.life);
+    }
+
+    // Player ship with 3D detail
     const px = this.player.x;
     const py = this.player.y;
-    g.fillStyle(PALETTE.cyan, 0.35);
-    g.fillRoundedRect(px - PLAYER_W / 2 - 6, py - PLAYER_H / 2 - 6, PLAYER_W + 12, PLAYER_H + 12, 8);
-    g.fillStyle(PALETTE.cyan, 1);
-    g.beginPath();
-    g.moveTo(px, py - PLAYER_H / 2);
-    g.lineTo(px + PLAYER_W / 2, py + PLAYER_H / 2);
-    g.lineTo(px - PLAYER_W / 2, py + PLAYER_H / 2);
-    g.closePath();
-    g.fillPath();
-    g.fillStyle(0xffffff, 0.8);
-    g.fillCircle(px, py - 8, 5);
-    g.fillStyle(PALETTE.cyan, 0.5);
-    g.fillTriangle(px - 8, py + PLAYER_H / 2, px + 8, py + PLAYER_H / 2, px, py + PLAYER_H / 2 + 18);
 
-    // HUD: keep all numbers aligned in columns on the left, fuel on the right
+    // Engine glow
+    g.fillStyle(PALETTE.cyan, 0.1);
+    g.fillCircle(px, py + PLAYER_H / 2 + 8, 14);
+    g.fillStyle(PALETTE.cyan, 0.2);
+    g.fillCircle(px, py + PLAYER_H / 2 + 6, 8);
+
+    // Ship body
+    drawSpriteTriangle(g,
+      px, py - PLAYER_H / 2,
+      px + PLAYER_W / 2, py + PLAYER_H / 2,
+      px - PLAYER_W / 2, py + PLAYER_H / 2,
+      {
+        fillColor: PALETTE.cyan,
+        outline: { color: 0x0891b2, width: 2 },
+        glow: { color: PALETTE.cyan, alpha: 0.15, size: 20 },
+      },
+    );
+
+    // Cockpit
+    g.fillStyle(0xffffff, 0.3);
+    g.fillCircle(px, py - 8, 5);
+
+    // Wing details
+    g.fillStyle(0x0891b2, 0.5);
+    g.fillTriangle(px - PLAYER_W / 2 + 2, py + PLAYER_H / 2 - 2, px - PLAYER_W / 2 - 6, py + PLAYER_H / 2 + 8, px - PLAYER_W / 4, py + PLAYER_H / 2 - 2);
+    g.fillTriangle(px + PLAYER_W / 2 - 2, py + PLAYER_H / 2 - 2, px + PLAYER_W / 2 + 6, py + PLAYER_H / 2 + 8, px + PLAYER_W / 4, py + PLAYER_H / 2 - 2);
+
+    // HUD
     this.scoreText.setText(String(this.score));
     this.distanceText.setText(`${Math.floor(this.distance / 10)}m`);
     this.livesText.setText(String(this.lives));
 
-    // FUEL on the right
+    // Fuel bar styled
     const fuelW = 160;
-    const fuelH = 8;
+    const fuelH = 10;
     const fuelX = w - fuelW - 20;
     const fuelY = 28;
-    g.fillStyle(PALETTE.surfaceLight, 1);
-    g.fillRoundedRect(fuelX, fuelY, fuelW, fuelH, 4);
     const pct = Phaser.Math.Clamp(this.fuel / 100, 0, 1);
-    g.fillStyle(this.fuel < 25 ? PALETTE.red : PALETTE.lime, 1);
-    g.fillRoundedRect(fuelX, fuelY, fuelW * pct, fuelH, 4);
-    g.lineStyle(1, PALETTE.border, 1);
-    g.strokeRoundedRect(fuelX, fuelY, fuelW, fuelH, 4);
+    const fuelColor = this.fuel < 25 ? PALETTE.red : (this.fuel < 50 ? PALETTE.yellow : PALETTE.lime);
+    drawProgressBar(g, fuelX, fuelY, fuelW, fuelH, pct, fuelColor, PALETTE.border);
     this.fuelLabelText.setPosition(fuelX, fuelY - 8).setVisible(true);
 
-    // instructions at bottom (same margin everywhere)
+    // Fuel low warning blink
+    if (this.fuel < 25 && Math.floor(this.waterTime * 4) % 2 === 0) {
+      g.lineStyle(2, PALETTE.red, 0.4);
+      g.strokeRoundedRect(fuelX - 2, fuelY - 2, fuelW + 4, fuelH + 4, 5);
+    }
+
     this.instructionsText.setPosition(20, h - 26).setVisible(true);
 
     if (this.gameOver) {
-      g.fillStyle(0x000000, 0.6);
+      g.fillStyle(0x000000, 0.7);
       g.fillRect(0, 0, w, h);
+      g.lineStyle(2, PALETTE.cyan, 0.2);
+      g.strokeRect(40, 40, w - 80, h - 80);
       const cx = w / 2;
       const cy = h / 2;
       this.gameOverText.setPosition(cx, cy - 10).setVisible(true);

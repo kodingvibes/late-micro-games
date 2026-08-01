@@ -3,12 +3,16 @@ import type { PhaserGameFactory } from "../shared/types";
 import { PALETTE, HEX, FONTS } from "../shared/theme";
 import { fadeInScene, screenShake, scorePop } from "../shared/effects";
 import { spawnExplosion, updateParticles, drawParticles } from "../shared/particles";
+import {
+  GradientBackground, createStarField, updateStarField, drawStarField,
+  drawSpriteBox, drawSpriteCircle, drawSpriteTriangle, drawPanel,
+} from "../shared/backgrounds";
 
 const ROWS = 5;
 const COLS = 8;
 
 interface Bullet { x: number; y: number; }
-interface Alien { x: number; y: number; alive: boolean; index: number; }
+interface Alien { x: number; y: number; alive: boolean; index: number; floatOff: number; }
 
 class SpaceInvadersScene extends Phaser.Scene {
   private playerX = 0;
@@ -38,11 +42,25 @@ class SpaceInvadersScene extends Phaser.Scene {
   private instructionsText!: Phaser.GameObjects.Text;
   private gameOverText!: Phaser.GameObjects.Text;
   private restartHintText!: Phaser.GameObjects.Text;
+  private bg!: GradientBackground;
+  private stars: { x: number; y: number; size: number; alpha: number; speed: number; }[] = [];
+  private engineParticles: { x: number; y: number; life: number; }[] = [];
+  private alienFloatTimer = 0;
 
   constructor() { super("SpaceInvaders"); }
 
   create() {
     this.graphics = this.add.graphics();
+    this.bg = new GradientBackground(this, {
+      layers: [
+        { speed: 0.01, colors: [0x05070e, 0x0b0d17, 0x0f1220], height: 1 },
+      ],
+      scanlines: true,
+      vignette: true,
+    });
+    this.stars = createStarField(700, 700, 100);
+
+    // HUD panel
     this.add.text(20, 12, "SCORE", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
     this.scoreText = this.add.text(20, 24, "0", { fontSize: "24px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } });
     this.add.text(140, 12, "LIVES", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
@@ -73,17 +91,19 @@ class SpaceInvadersScene extends Phaser.Scene {
   private reset() {
     this.bullets = [];
     this.aliens = [];
+    this.engineParticles = [];
     this.score = 0;
     this.lives = 3;
     this.gameOver = false;
     this.paused = false;
     this.alienDir = 1;
     this.alienSpeed = 0.6;
+    this.alienFloatTimer = 0;
     this.layout();
     this.playerX = this.playW / 2 - this.playerW / 2;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
-        this.aliens.push({ x: 50 * this.scale_ + c * 50 * this.scale_, y: 40 * this.scale_ + r * 40 * this.scale_, alive: true, index: r * COLS + c });
+        this.aliens.push({ x: 50 * this.scale_ + c * 50 * this.scale_, y: 40 * this.scale_ + r * 40 * this.scale_, alive: true, index: r * COLS + c, floatOff: Math.random() * Math.PI * 2 });
       }
     }
     this.scoreText.setText(String(this.score));
@@ -115,14 +135,23 @@ class SpaceInvadersScene extends Phaser.Scene {
 
   override update(_t: number, delta: number) {
     if (this.gameOver || this.paused) return;
+    const dt = delta / 1000;
     this.layout();
     const left = this.keyLeft.isDown || this.keyA.isDown;
     const right = this.keyRight.isDown || this.keyD.isDown;
-    if (left) this.playerX -= 300 * this.scale_ * delta / 1000;
-    if (right) this.playerX += 300 * this.scale_ * delta / 1000;
+    if (left) this.playerX -= 300 * this.scale_ * dt;
+    if (right) this.playerX += 300 * this.scale_ * dt;
     this.playerX = Phaser.Math.Clamp(this.playerX, 0, this.playW - this.playerW);
 
-    this.alienTimer += delta / 1000;
+    // Engine particles
+    this.engineParticles.push({ x: this.playerX + this.playerW / 2, y: this.playH - 10 * this.scale_, life: 0.3 });
+    for (const p of this.engineParticles) { p.life -= dt; p.y += 20 * dt; }
+    this.engineParticles = this.engineParticles.filter((p) => p.life > 0);
+
+    // Alien float animation
+    this.alienFloatTimer += dt;
+
+    this.alienTimer += dt;
     if (this.alienTimer >= 1 / (this.alienSpeed * 6)) {
       this.alienTimer = 0;
       let edge = false;
@@ -145,10 +174,10 @@ class SpaceInvadersScene extends Phaser.Scene {
       }
     }
 
-    const bw = 4 * this.scale_, bh = 10 * this.scale_, aw = 30 * this.scale_, ah = 20 * this.scale_;
+    const aw = 30 * this.scale_, ah = 20 * this.scale_;
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const b = this.bullets[i];
-      b.y -= 400 * this.scale_ * delta / 1000;
+      b.y -= 400 * this.scale_ * dt;
       if (b.y < 0) { this.bullets.splice(i, 1); continue; }
       for (const a of this.aliens) {
         if (!a.alive) continue;
@@ -179,53 +208,139 @@ class SpaceInvadersScene extends Phaser.Scene {
     this.overlay.removeAll(false);
     const w = this.scale.width;
     const h = this.scale.height;
-    g.fillStyle(PALETTE.bg, 1);
-    g.fillRect(0, 0, w, h);
 
-    // instructions at bottom
+    // Background with stars
+    this.bg.draw(g, w, h);
+    updateStarField(this.stars, 0.016, 20, w, h);
+    drawStarField(g, this.stars);
+
+    // Instructions
     this.instructionsText.setPosition(20, h - 26).setVisible(true);
 
-    g.fillStyle(PALETTE.surface, 1);
-    g.fillRoundedRect(this.ox - 8, this.oy - 8, this.playW + 16, this.playH + 16, 14);
+    // Play area panel
+    drawPanel(g, this.ox - 8, this.oy - 8, this.playW + 16, this.playH + 16, {
+      borderColor: PALETTE.accent,
+      borderWidth: 2,
+      shadowOffset: 4,
+      cornerRadius: 12,
+      fillColor: PALETTE.surface,
+    });
 
-    g.fillStyle(PALETTE.surfaceLight, 1);
+    // Play area background (darker)
+    g.fillStyle(0x080a14, 0.6);
     g.fillRect(this.ox, this.oy, this.playW, this.playH);
 
-    const pw = this.playerW, ph = 20 * this.scale_;
-    g.fillStyle(PALETTE.cyan, 0.35);
-    g.fillRoundedRect(this.ox + this.playerX - 6, this.oy + this.playH - ph - 10 * this.scale_ - 6, pw + 12, ph + 12, 6);
-    g.fillStyle(PALETTE.cyan, 1);
-    g.fillRoundedRect(this.ox + this.playerX, this.oy + this.playH - ph - 10 * this.scale_, pw, ph, 4);
-    g.fillStyle(0xffffff, 0.6);
-    g.fillCircle(this.ox + this.playerX + pw * 0.3, this.oy + this.playH - ph - 10 * this.scale_ + ph * 0.3, ph * 0.2);
+    // Grid lines in play area
+    g.lineStyle(1, PALETTE.accent, 0.06);
+    for (let x = this.ox; x <= this.ox + this.playW; x += 30 * this.scale_) {
+      g.lineBetween(x, this.oy, x, this.oy + this.playH);
+    }
+    for (let y = this.oy; y <= this.oy + this.playH; y += 30 * this.scale_) {
+      g.lineBetween(this.ox, y, this.ox + this.playW, y);
+    }
 
+    // Player ship with 3D shading
+    const pw = this.playerW, ph = 20 * this.scale_;
+    const sx = this.ox + this.playerX;
+    const sy = this.oy + this.playH - ph - 10 * this.scale_;
+
+    // Engine glow
+    g.fillStyle(PALETTE.cyan, 0.15);
+    g.fillCircle(sx + pw / 2, sy + ph + 6, pw * 0.6);
+    g.fillStyle(PALETTE.cyan, 0.3);
+    g.fillCircle(sx + pw / 2, sy + ph + 4, pw * 0.35);
+
+    // Engine particles
+    for (const p of this.engineParticles) {
+      g.fillStyle(PALETTE.cyan, p.life * 0.5);
+      g.fillCircle(this.ox + p.x, this.oy + p.y, 2 * p.life * this.scale_);
+    }
+
+    // Ship body
+    drawSpriteBox(g, sx, sy, pw, ph, {
+      fillColor: PALETTE.cyan,
+      outline: { color: 0x0891b2, width: 2 },
+      highlight: { x: 0.25, y: 0.2, size: 0.3, alpha: 0.5 },
+      shadow: { offset: 3, alpha: 0.3 },
+      cornerRadius: 4,
+    });
+
+    // Ship cockpit
+    g.fillStyle(0xffffff, 0.3);
+    g.fillCircle(sx + pw * 0.5, sy + ph * 0.35, pw * 0.12);
+
+    // Ship wings detail
+    g.fillStyle(0x0891b2, 0.5);
+    g.fillTriangle(sx + 2, sy + ph - 2, sx - 4, sy + ph + 6, sx + pw * 0.3, sy + ph - 2);
+    g.fillTriangle(sx + pw - 2, sy + ph - 2, sx + pw + 4, sy + ph + 6, sx + pw * 0.7, sy + ph - 2);
+
+    // Bullets with glow trail
     const bw = 4 * this.scale_, bh = 10 * this.scale_;
     for (const b of this.bullets) {
-      g.fillStyle(PALETTE.yellow, 0.45);
-      g.fillCircle(this.ox + b.x, this.oy + b.y + bh / 2, bw * 2);
-      g.fillStyle(PALETTE.yellow, 1);
-      g.fillCircle(this.ox + b.x, this.oy + b.y + bh / 2, bw * 0.7);
-      g.fillStyle(0xffffff, 0.8);
-      g.fillCircle(this.ox + b.x, this.oy + b.y + bh / 2, bw * 0.3);
+      g.fillStyle(PALETTE.yellow, 0.2);
+      g.fillCircle(this.ox + b.x, this.oy + b.y + bh / 2, bw * 2.5);
+      g.fillStyle(PALETTE.yellow, 0.5);
+      g.fillCircle(this.ox + b.x, this.oy + b.y + bh / 2, bw * 1.2);
+      g.fillStyle(0xffffff, 0.9);
+      g.fillCircle(this.ox + b.x, this.oy + b.y + bh / 2, bw * 0.5);
+      // Trail
+      g.fillStyle(PALETTE.yellow, 0.15);
+      g.fillCircle(this.ox + b.x, this.oy + b.y + bh / 2 + 6, bw * 0.8);
     }
 
+    // Aliens with 3D detail
     const aw = 30 * this.scale_, ah = 20 * this.scale_;
     for (const a of this.aliens) if (a.alive) {
+      const floatY = Math.sin(this.alienFloatTimer * 2 + a.floatOff) * 3 * this.scale_;
+      const ax = this.ox + a.x;
+      const ay = this.oy + a.y + floatY;
       const alienColor = (a.index % 3 === 0) ? PALETTE.green : ((a.index % 3 === 1) ? PALETTE.lime : PALETTE.accentSoft);
-      g.fillStyle(alienColor, 0.25);
-      g.fillRoundedRect(this.ox + a.x - 4, this.oy + a.y - 4, aw + 8, ah + 8, 4);
-      g.fillStyle(alienColor, 1);
-      g.fillRoundedRect(this.ox + a.x, this.oy + a.y, aw, ah, 4);
-      g.fillStyle(PALETTE.bg, 1);
-      g.fillRoundedRect(this.ox + a.x + aw * 0.2, this.oy + a.y + ah * 0.3, aw * 0.6, ah * 0.2, 2);
-      g.fillStyle(0xffffff, 0.5);
-      g.fillCircle(this.ox + a.x + aw * 0.25, this.oy + a.y + ah * 0.2, aw * 0.08);
-      g.fillCircle(this.ox + a.x + aw * 0.75, this.oy + a.y + ah * 0.2, aw * 0.08);
+      const darkColor = (a.index % 3 === 0) ? 0x166534 : ((a.index % 3 === 1) ? 0x4d7c0f : 0x3730a3);
+
+      // Alien glow
+      g.fillStyle(alienColor, 0.1);
+      g.fillCircle(ax + aw / 2, ay + ah / 2, aw * 0.7);
+
+      // Alien body
+      drawSpriteBox(g, ax, ay, aw, ah, {
+        fillColor: alienColor,
+        outline: { color: darkColor, width: 2 },
+        highlight: { x: 0.25, y: 0.2, size: 0.3, alpha: 0.4 },
+        shadow: { offset: 2, alpha: 0.2 },
+        cornerRadius: 5,
+      });
+
+      // Alien eyes
+      g.fillStyle(0xffffff, 0.8);
+      g.fillCircle(ax + aw * 0.3, ay + ah * 0.3, aw * 0.1);
+      g.fillCircle(ax + aw * 0.7, ay + ah * 0.3, aw * 0.1);
+      g.fillStyle(0x000000, 0.8);
+      g.fillCircle(ax + aw * 0.3, ay + ah * 0.3, aw * 0.05);
+      g.fillCircle(ax + aw * 0.7, ay + ah * 0.3, aw * 0.05);
+
+      // Alien mouth/teeth
+      g.fillStyle(0xffffff, 0.3);
+      g.fillRect(ax + aw * 0.2, ay + ah * 0.6, aw * 0.6, ah * 0.15);
+      g.fillStyle(darkColor, 0.5);
+      for (let t = 0; t < 3; t++) {
+        g.fillRect(ax + aw * (0.25 + t * 0.2), ay + ah * 0.6, aw * 0.08, ah * 0.15);
+      }
+
+      // Alien antenna
+      g.lineStyle(1, darkColor, 0.6);
+      g.lineBetween(ax + aw * 0.3, ay, ax + aw * 0.3, ay - 4 * this.scale_);
+      g.lineBetween(ax + aw * 0.7, ay, ax + aw * 0.7, ay - 4 * this.scale_);
+      g.fillStyle(PALETTE.yellow, 0.6);
+      g.fillCircle(ax + aw * 0.3, ay - 4 * this.scale_, 1.5 * this.scale_);
+      g.fillCircle(ax + aw * 0.7, ay - 4 * this.scale_, 1.5 * this.scale_);
     }
 
+    // Game over overlay
     if (this.gameOver) {
-      g.fillStyle(0x000000, 0.5);
+      g.fillStyle(0x000000, 0.6);
       g.fillRect(this.ox, this.oy, this.playW, this.playH);
+      g.lineStyle(2, PALETTE.cyan, 0.3);
+      g.strokeRect(this.ox + 20, this.oy + 20, this.playW - 40, this.playH - 40);
       this.gameOverText.setPosition(this.ox + this.playW / 2, this.oy + this.playH / 2 - 8).setVisible(true);
       this.restartHintText.setPosition(this.ox + this.playW / 2, this.oy + this.playH / 2 + 34).setVisible(true);
     } else {

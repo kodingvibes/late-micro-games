@@ -2,6 +2,9 @@ import Phaser from "phaser";
 import type { PhaserGameFactory } from "../shared/types";
 import { PALETTE, HEX, FONTS } from "../shared/theme";
 import { fadeInScene, screenShake, scorePop } from "../shared/effects";
+import {
+  GradientBackground, drawSpriteBox, drawPanel, drawTileGrid,
+} from "../shared/backgrounds";
 
 const COLS = 10;
 const ROWS = 20;
@@ -16,10 +19,11 @@ const SHAPES: number[][][] = [
   [[1, 1, 0], [0, 1, 1], [0, 0, 0]],
 ];
 const COLORS = [PALETTE.yellow, PALETTE.cyan, PALETTE.violet, PALETTE.orange, PALETTE.accent, PALETTE.green, PALETTE.red];
+const DARK_COLORS = [0x854d0e, 0x0891b2, 0x5b21b6, 0x9a3412, 0x3730a3, 0x166534, 0x991b1b];
 
 class TetrisScene extends Phaser.Scene {
   private board: number[][] = [];
-  private current!: { shape: number[][]; color: number; x: number; y: number };
+  private current!: { shape: number[][]; color: number; darkColor: number; x: number; y: number };
   private score = 0;
   private lines = 0;
   private gameOver = false;
@@ -35,12 +39,24 @@ class TetrisScene extends Phaser.Scene {
   private gameOverText!: Phaser.GameObjects.Text;
   private restartHintText!: Phaser.GameObjects.Text;
   private nextLabelText!: Phaser.GameObjects.Text;
+  private bg!: GradientBackground;
+  private ox = 0;
+  private oy = 0;
+  private flashLines: number[] = [];
+  private flashTimer = 0;
 
   constructor() { super("Tetris"); }
 
   create() {
     this.board = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
     this.graphics = this.add.graphics();
+    this.bg = new GradientBackground(this, {
+      layers: [
+        { speed: 0.01, colors: [0x05070e, 0x0b0d17, 0x0f1220], height: 1 },
+      ],
+      scanlines: true,
+      vignette: true,
+    });
 
     this.add.text(20, 12, "SCORE", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setOrigin(0, 0);
     this.scoreText = this.add.text(20, 26, "0", {
@@ -80,7 +96,7 @@ class TetrisScene extends Phaser.Scene {
 
   private spawnPiece() {
     const i = Phaser.Math.Between(0, SHAPES.length - 1);
-    this.current = { shape: SHAPES[i], color: COLORS[i], x: Math.floor(COLS / 2) - 2, y: 0 };
+    this.current = { shape: SHAPES[i], color: COLORS[i], darkColor: DARK_COLORS[i], x: Math.floor(COLS / 2) - 2, y: 0 };
     if (!this.valid(this.current.shape, this.current.x, this.current.y)) this.gameOver = true;
   }
 
@@ -112,6 +128,7 @@ class TetrisScene extends Phaser.Scene {
     let cleared = 0;
     for (let y = ROWS - 1; y >= 0; y--) {
       if (this.board[y].every((c) => c !== -1)) {
+        this.flashLines.push(y);
         this.board.splice(y, 1);
         this.board.unshift(Array(COLS).fill(-1));
         cleared++;
@@ -128,6 +145,7 @@ class TetrisScene extends Phaser.Scene {
       const cx = Math.floor((this.scale.width - COLS * CELL) / 2) + (COLS * CELL) / 2;
       const cy = Math.max(70, Math.floor((this.scale.height - ROWS * CELL) / 2)) + (ROWS * CELL) / 2;
       scorePop(this, cx, cy, `+${cleared * 100 * cleared}`);
+      this.flashTimer = 0.3;
     }
   }
 
@@ -151,11 +169,7 @@ class TetrisScene extends Phaser.Scene {
   private handleKey(e: KeyboardEvent) {
     if (e.code === "KeyR") { this.scene.restart(); return; }
     if (this.gameOver) return;
-    if (e.code === "KeyP") {
-      this.paused = !this.paused;
-      this.statusText.setText(this.paused ? "PAUSA" : "");
-      return;
-    }
+    if (e.code === "KeyP") { this.paused = !this.paused; this.statusText.setText(this.paused ? "PAUSA" : ""); return; }
     if (this.paused) return;
     switch (e.code) {
       case "ArrowLeft": if (this.valid(this.current.shape, this.current.x - 1, this.current.y)) this.current.x--; break;
@@ -178,6 +192,10 @@ class TetrisScene extends Phaser.Scene {
       else this.lock();
       this.draw();
     }
+    if (this.flashTimer > 0) {
+      this.flashTimer -= delta / 1000;
+      this.draw();
+    }
   }
 
   private draw() {
@@ -186,46 +204,86 @@ class TetrisScene extends Phaser.Scene {
     this.overlay.removeAll(false);
     const w = this.scale.width;
     const h = this.scale.height;
+
+    // Background
+    this.bg.draw(g, w, h);
+
     const boardW = COLS * CELL;
     const boardH = ROWS * CELL;
-    const ox = Math.floor((w - boardW) / 2);
-    const oy = Math.max(70, Math.floor((h - boardH) / 2));
+    this.ox = Math.floor((w - boardW) / 2);
+    this.oy = Math.max(70, Math.floor((h - boardH) / 2));
 
-    g.fillStyle(PALETTE.surface, 1);
-    g.fillRect(ox, oy, boardW, boardH);
+    // Board panel
+    drawPanel(g, this.ox - 8, this.oy - 8, boardW + 16, boardH + 16, {
+      borderColor: PALETTE.accent,
+      borderWidth: 2,
+      shadowOffset: 4,
+      cornerRadius: 10,
+      fillColor: PALETTE.surface,
+    });
 
-    // grid
-    g.lineStyle(1, PALETTE.border, 1);
-    for (let x = 0; x <= COLS; x++) g.lineBetween(ox + x * CELL, oy, ox + x * CELL, oy + boardH);
-    for (let y = 0; y <= ROWS; y++) g.lineBetween(ox, oy + y * CELL, ox + boardW, oy + y * CELL);
+    // Board background
+    g.fillStyle(0x080a14, 0.5);
+    g.fillRect(this.ox, this.oy, boardW, boardH);
 
-    // locked cells
+    // Grid lines
+    drawTileGrid(g, this.ox, this.oy, boardW, boardH, CELL, CELL, PALETTE.accent, 0.08);
+
+    // Draw locked cells with 3D bevel
     for (let y = 0; y < ROWS; y++) {
       for (let x = 0; x < COLS; x++) {
-        if (this.board[y][x] !== -1) this.drawCell(g, ox, oy, x, y, this.board[y][x]);
-      }
-    }
-    // current piece
-    if (this.current && !this.gameOver) {
-      for (let y = 0; y < this.current.shape.length; y++) {
-        for (let x = 0; x < this.current.shape[y].length; x++) {
-          if (!this.current.shape[y][x]) continue;
-          this.drawCell(g, ox, oy, this.current.x + x, this.current.y + y, this.current.color);
+        if (this.board[y][x] !== -1) {
+          const isFlashing = this.flashTimer > 0 && this.flashLines.includes(y);
+          if (isFlashing && Math.floor(this.flashTimer * 10) % 2 === 0) {
+            g.fillStyle(0xffffff, 0.8);
+            g.fillRect(this.ox + x * CELL, this.oy + y * CELL, CELL, CELL);
+          } else {
+            this.drawCell(g, this.ox, this.oy, x, y, this.board[y][x]);
+          }
         }
       }
     }
 
-    // next box
+    // Draw current piece with 3D bevel
+    if (this.current && !this.gameOver) {
+      for (let y = 0; y < this.current.shape.length; y++) {
+        for (let x = 0; x < this.current.shape[y].length; x++) {
+          if (!this.current.shape[y][x]) continue;
+          this.drawCell(g, this.ox, this.oy, this.current.x + x, this.current.y + y, this.current.color);
+        }
+      }
+    }
+
+    // Ghost piece (shadow)
+    if (this.current && !this.gameOver) {
+      let gy = this.current.y;
+      while (this.valid(this.current.shape, this.current.x, gy + 1)) gy++;
+      if (gy !== this.current.y) {
+        for (let y = 0; y < this.current.shape.length; y++) {
+          for (let x = 0; x < this.current.shape[y].length; x++) {
+            if (!this.current.shape[y][x]) continue;
+            const px = this.ox + (this.current.x + x) * CELL + 1;
+            const py = this.oy + (gy + y) * CELL + 1;
+            g.lineStyle(1, this.current.color, 0.3);
+            g.strokeRoundedRect(px, py, CELL - 2, CELL - 2, 4);
+          }
+        }
+      }
+    }
+
+    // Next piece preview
     const nextSize = CELL * 5;
-    const nextX = ox + boardW + 24;
-    const nextY = oy + 24;
-    g.fillStyle(PALETTE.surface, 1);
-    g.fillRoundedRect(nextX, nextY, nextSize, nextSize, 10);
-    g.lineStyle(1, PALETTE.border, 1);
-    g.strokeRoundedRect(nextX, nextY, nextSize, nextSize, 10);
+    const nextX = this.ox + boardW + 24;
+    const nextY = this.oy + 24;
+    drawPanel(g, nextX, nextY, nextSize, nextSize, {
+      borderColor: PALETTE.border,
+      borderWidth: 1,
+      shadowOffset: 3,
+      cornerRadius: 8,
+      fillColor: PALETTE.surface,
+    });
     this.nextLabelText.setPosition(nextX + nextSize / 2, nextY - 14).setVisible(true);
 
-    // render next piece centered in box
     const nextPiece = this.current ? this.current.shape : SHAPES[0];
     const pcw = nextPiece[0].length * CELL;
     const pch = nextPiece.length * CELL;
@@ -238,14 +296,15 @@ class TetrisScene extends Phaser.Scene {
       }
     }
 
-    // instructions at bottom
     this.instructionsText.setPosition(20, h - 26).setVisible(true);
 
     if (this.gameOver) {
-      const cx = ox + boardW / 2;
-      const cy = oy + boardH / 2;
       g.fillStyle(0x000000, 0.6);
-      g.fillRect(ox, oy, boardW, boardH);
+      g.fillRect(this.ox, this.oy, boardW, boardH);
+      g.lineStyle(2, PALETTE.cyan, 0.3);
+      g.strokeRect(this.ox + 20, this.oy + 20, boardW - 40, boardH - 40);
+      const cx = this.ox + boardW / 2;
+      const cy = this.oy + boardH / 2;
       this.gameOverText.setPosition(cx, cy - 8).setVisible(true);
       this.restartHintText.setPosition(cx, cy + 30).setVisible(true);
     } else {
@@ -257,12 +316,31 @@ class TetrisScene extends Phaser.Scene {
   private drawCell(g: Phaser.GameObjects.Graphics, ox: number, oy: number, x: number, y: number, color: number) {
     const px = ox + x * CELL + 1;
     const py = oy + y * CELL + 1;
-    g.fillStyle(color, 0.35);
-    g.fillRoundedRect(px - 4, py - 4, CELL + 8, CELL + 8, 5);
+    const sz = CELL - 2;
+
+    // Find dark color for this piece
+    const idx = COLORS.indexOf(color);
+    const darkColor = idx >= 0 ? DARK_COLORS[idx] : 0x1e213a;
+
+    // 3D bevel: shadow bottom-right
+    g.fillStyle(0x000000, 0.3);
+    g.fillRoundedRect(px + 1, py + 1, sz, sz, 4);
+
+    // Main fill
     g.fillStyle(color, 1);
-    g.fillRoundedRect(px, py, CELL - 2, CELL - 2, 4);
-    g.fillStyle(0xffffff, 0.25);
-    g.fillCircle(px + CELL * 0.25, py + CELL * 0.25, 3);
+    g.fillRoundedRect(px, py, sz, sz, 4);
+
+    // Top-left highlight
+    g.fillStyle(0xffffff, 0.2);
+    g.fillRoundedRect(px + 1, py + 1, sz - 2, sz * 0.4, 3);
+
+    // Bottom-right dark edge
+    g.fillStyle(darkColor, 0.3);
+    g.fillRoundedRect(px + sz * 0.5, py + sz * 0.6, sz * 0.5, sz * 0.4, 2);
+
+    // Outline
+    g.lineStyle(1, darkColor, 0.6);
+    g.strokeRoundedRect(px, py, sz, sz, 4);
   }
 }
 
