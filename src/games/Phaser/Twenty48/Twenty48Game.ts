@@ -36,12 +36,14 @@ class Twenty48Scene extends Phaser.Scene {
     this.overlay.add(this.restartHintText);
     this.overlay.add(this.winText);
     this.input.keyboard?.on("keydown", this.handleKey, this);
-    this.scale.on("resize", () => this.draw(), this);
-    this.events.on('shutdown', () => {
-      this.input.keyboard?.off("keydown", this.handleKey, this);
-      this.scale.off("resize", this.draw, this);
-    });
+    this.scale.on("resize", this.draw, this);
+    this.events.on('shutdown', this.onShutdown, this);
     this.reset();
+  }
+
+  private onShutdown() {
+    this.input.keyboard?.off("keydown", this.handleKey, this);
+    this.scale.off("resize", this.draw, this);
   }
 
   private reset() {
@@ -191,7 +193,6 @@ class Twenty48Scene extends Phaser.Scene {
         }
         if (v > 0) {
           const fontSize = Math.max(12, this.tileSize * 0.4);
-          const color = v <= 4 ? "#776e65" : "#fff";
           const txt = this.add.text(px + this.tileSize / 2, py + this.tileSize / 2, String(v), {
             fontSize: `${fontSize}px`, color: v <= 4 ? "#94a3b8" : "#e2e8f0", fontStyle: v >= 8 ? "italic" : "bold", fontFamily: v >= 8 ? FONTS.dseg.fontFamily : FONTS.ui.fontFamily,
             shadow: v >= 8 ? { offsetX: 0, offsetY: 0, blur: 8, color: HEX.cyan, fill: true } : undefined,

@@ -57,12 +57,14 @@ class SpaceInvadersScene extends Phaser.Scene {
     this.keyD = this.input.keyboard!.addKey("D");
     this.input.keyboard?.on("keydown", this.handleKey, this);
     this.input.keyboard?.addCapture(["SPACE", "LEFT", "RIGHT", "UP", "DOWN", "A", "D", "W", "S", "P", "R"]);
-    this.scale.on("resize", () => this.draw(), this);
-    this.events.on('shutdown', () => {
-      this.input.keyboard?.off("keydown", this.handleKey, this);
-      this.scale.off("resize", this.draw, this);
-    });
+    this.scale.on("resize", this.draw, this);
+    this.events.on('shutdown', this.onShutdown, this);
     this.reset();
+  }
+
+  private onShutdown() {
+    this.input.keyboard?.off("keydown", this.handleKey, this);
+    this.scale.off("resize", this.draw, this);
   }
 
   private reset() {

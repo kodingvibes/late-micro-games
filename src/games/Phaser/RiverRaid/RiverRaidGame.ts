@@ -88,12 +88,14 @@ class RiverRaidScene extends Phaser.Scene {
     this.keyA = this.input.keyboard!.addKey("A");
     this.keyD = this.input.keyboard!.addKey("D");
     this.input.keyboard?.on("keydown", this.handleKey, this);
-    this.scale.on("resize", () => this.draw(), this);
-    this.events.on('shutdown', () => {
-      this.input.keyboard?.off("keydown", this.handleKey, this);
-      this.scale.off("resize", this.draw, this);
-    });
+    this.scale.on("resize", this.draw, this);
+    this.events.on('shutdown', this.onShutdown, this);
     this.reset();
+  }
+
+  private onShutdown() {
+    this.input.keyboard?.off("keydown", this.handleKey, this);
+    this.scale.off("resize", this.draw, this);
   }
 
   private reset() {

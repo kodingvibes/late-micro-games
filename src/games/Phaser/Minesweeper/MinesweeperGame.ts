@@ -34,13 +34,15 @@ class MinesweeperScene extends Phaser.Scene {
     this.instructionsText = this.add.text(20, 0, "Click izq: revelar · Click der: bandera · R: reiniciar", { fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily }).setVisible(false);
     this.input.keyboard?.on("keydown", this.handleKey, this);
     this.input.on("pointerdown", this.handleClick, this);
-    this.scale.on("resize", () => this.draw(), this);
-    this.events.on('shutdown', () => {
-      this.input.keyboard?.off("keydown", this.handleKey, this);
-      this.input.off("pointerdown", this.handleClick, this);
-      this.scale.off("resize", this.draw, this);
-    });
+    this.scale.on("resize", this.draw, this);
+    this.events.on('shutdown', this.onShutdown, this);
     this.draw();
+  }
+
+  private onShutdown() {
+    this.input.keyboard?.off("keydown", this.handleKey, this);
+    this.input.off("pointerdown", this.handleClick, this);
+    this.scale.off("resize", this.draw, this);
   }
 
   private layout() {

@@ -67,11 +67,13 @@ class TetrisScene extends Phaser.Scene {
     this.spawnPiece();
     this.input.keyboard?.on("keydown", this.handleKey, this);
     this.scale.on("resize", this.draw, this);
-    this.events.on('shutdown', () => {
-      this.input.keyboard?.off("keydown", this.handleKey, this);
-      this.scale.off("resize", this.draw, this);
-    });
+    this.events.on('shutdown', this.onShutdown, this);
     this.draw();
+  }
+
+  private onShutdown() {
+    this.input.keyboard?.off("keydown", this.handleKey, this);
+    this.scale.off("resize", this.draw, this);
   }
 
   private spawnPiece() {
