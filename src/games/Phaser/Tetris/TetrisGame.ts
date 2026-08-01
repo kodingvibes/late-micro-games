@@ -177,7 +177,7 @@ class TetrisScene extends Phaser.Scene {
   private draw() {
     const g = this.graphics;
     g.clear();
-    this.overlay.removeAll(true);
+    this.overlay.removeAll(false);
     const w = this.scale.width;
     const h = this.scale.height;
     const boardW = COLS * CELL;

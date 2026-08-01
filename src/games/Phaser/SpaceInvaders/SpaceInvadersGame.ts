@@ -6,7 +6,7 @@ const ROWS = 5;
 const COLS = 8;
 
 interface Bullet { x: number; y: number; }
-interface Alien { x: number; y: number; alive: boolean; }
+interface Alien { x: number; y: number; alive: boolean; index: number; }
 
 class SpaceInvadersScene extends Phaser.Scene {
   private playerX = 0;
@@ -80,7 +80,7 @@ class SpaceInvadersScene extends Phaser.Scene {
     this.playerX = this.playW / 2 - this.playerW / 2;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
-        this.aliens.push({ x: 50 * this.scale_ + c * 50 * this.scale_, y: 40 * this.scale_ + r * 40 * this.scale_, alive: true });
+        this.aliens.push({ x: 50 * this.scale_ + c * 50 * this.scale_, y: 40 * this.scale_ + r * 40 * this.scale_, alive: true, index: r * COLS + c });
       }
     }
     this.scoreText.setText(String(this.score));
@@ -136,7 +136,7 @@ class SpaceInvadersScene extends Phaser.Scene {
         if (a.y + 20 * this.scale_ >= this.playH - 30 * this.scale_) {
           this.lives--;
           if (this.lives <= 0) this.gameOver = true;
-          else { for (const b of this.aliens) if (b.alive) { b.x = 50 * this.scale_ + (this.aliens.indexOf(b) % COLS) * 50 * this.scale_; b.y = 40 * this.scale_ + Math.floor(this.aliens.indexOf(b) / COLS) * 40 * this.scale_; } this.bullets = []; }
+          else { for (const b of this.aliens) if (b.alive) { const col = b.index % COLS; const row = Math.floor(b.index / COLS); b.x = 50 * this.scale_ + col * 50 * this.scale_; b.y = 40 * this.scale_ + row * 40 * this.scale_; } this.bullets = []; }
         }
       }
     }
@@ -171,7 +171,7 @@ class SpaceInvadersScene extends Phaser.Scene {
     this.layout();
     const g = this.graphics;
     g.clear();
-    this.overlay.removeAll(true);
+    this.overlay.removeAll(false);
     const w = this.scale.width;
     const h = this.scale.height;
     g.fillStyle(PALETTE.bg, 1);
@@ -206,7 +206,7 @@ class SpaceInvadersScene extends Phaser.Scene {
 
     const aw = 30 * this.scale_, ah = 20 * this.scale_;
     for (const a of this.aliens) if (a.alive) {
-      const alienColor = (this.aliens.indexOf(a) % 3 === 0) ? PALETTE.green : ((this.aliens.indexOf(a) % 3 === 1) ? PALETTE.lime : PALETTE.accentSoft);
+      const alienColor = (a.index % 3 === 0) ? PALETTE.green : ((a.index % 3 === 1) ? PALETTE.lime : PALETTE.accentSoft);
       g.fillStyle(alienColor, 0.25);
       g.fillRoundedRect(this.ox + a.x - 4, this.oy + a.y - 4, aw + 8, ah + 8, 4);
       g.fillStyle(alienColor, 1);

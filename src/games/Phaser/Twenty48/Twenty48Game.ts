@@ -160,7 +160,7 @@ class Twenty48Scene extends Phaser.Scene {
   private draw() {
     const g = this.graphics;
     g.clear();
-    this.overlay.removeAll(true);
+    this.overlay.removeAll(false);
     const w = this.scale.width;
     const h = this.scale.height;
     const maxBoard = Math.min(w, h - 80) - 40;

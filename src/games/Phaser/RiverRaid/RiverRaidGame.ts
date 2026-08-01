@@ -144,7 +144,7 @@ class RiverRaidScene extends Phaser.Scene {
 
   private handleKey(e: KeyboardEvent) {
     if (e.code === "KeyR") { this.scene.restart(); return; }
-    if (this.gameOver) return;
+    if (this.gameOver || this.paused) return;
     if (e.code === "KeyP") { this.paused = !this.paused; return; }
     if (e.code === "Space") {
       this.bullets.push({ x: this.player.x, y: this.player.y - 28, alive: true });
@@ -307,7 +307,7 @@ class RiverRaidScene extends Phaser.Scene {
         }
       }
     }
-    this.enemies = this.enemies.filter((e) => e.alive || e.y < h + 80);
+    this.enemies = this.enemies.filter((e) => e.y < h + 80);
 
     // particles
     for (const p of this.particles) {
@@ -332,7 +332,7 @@ class RiverRaidScene extends Phaser.Scene {
   private draw() {
     const g = this.graphics;
     g.clear();
-    this.overlay.removeAll(true);
+    this.overlay.removeAll(false);
     const w = this.scale.width;
     const h = this.scale.height;
 

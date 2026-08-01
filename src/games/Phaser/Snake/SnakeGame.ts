@@ -62,7 +62,10 @@ class SnakeScene extends Phaser.Scene {
   }
 
   private spawnFood() {
-    while (true) {
+    let attempts = 0;
+    const maxAttempts = GRID_W * GRID_H;
+    while (attempts < maxAttempts) {
+      attempts++;
       const x = Phaser.Math.Between(0, GRID_W - 1);
       const y = Phaser.Math.Between(0, GRID_H - 1);
       if (!this.snake.some((s) => s.x === x && s.y === y)) {
