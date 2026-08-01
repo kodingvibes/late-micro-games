@@ -29,6 +29,10 @@ class SpaceInvadersScene extends Phaser.Scene {
   private ox = 0;
   private oy = 80;
   private scale_ = 1;
+  private keyLeft!: Phaser.Input.Keyboard.Key;
+  private keyRight!: Phaser.Input.Keyboard.Key;
+  private keyA!: Phaser.Input.Keyboard.Key;
+  private keyD!: Phaser.Input.Keyboard.Key;
 
   constructor() { super("SpaceInvaders"); }
 
@@ -39,9 +43,17 @@ class SpaceInvadersScene extends Phaser.Scene {
     this.add.text(140, 12, "LIVES", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
     this.livesText = this.add.text(140, 24, "3", { fontSize: "24px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } });
     this.overlay = this.add.container(0, 0);
+    this.keyLeft = this.input.keyboard!.addKey("LEFT");
+    this.keyRight = this.input.keyboard!.addKey("RIGHT");
+    this.keyA = this.input.keyboard!.addKey("A");
+    this.keyD = this.input.keyboard!.addKey("D");
     this.input.keyboard?.on("keydown", this.handleKey, this);
-    this.input.keyboard?.addCapture("SPACE,LEFT,RIGHT,UP,DOWN,A,D,W,S,P,R");
+    this.input.keyboard?.addCapture(["SPACE", "LEFT", "RIGHT", "UP", "DOWN", "A", "D", "W", "S", "P", "R"]);
     this.scale.on("resize", () => this.draw(), this);
+    this.events.on('shutdown', () => {
+      this.input.keyboard?.off("keydown", this.handleKey, this);
+      this.scale.off("resize", this.draw, this);
+    });
     this.reset();
   }
 
@@ -91,8 +103,8 @@ class SpaceInvadersScene extends Phaser.Scene {
   override update(_t: number, delta: number) {
     if (this.gameOver || this.paused) return;
     this.layout();
-    const left = this.input.keyboard?.addKey("LEFT")?.isDown || this.input.keyboard?.addKey("A")?.isDown;
-    const right = this.input.keyboard?.addKey("RIGHT")?.isDown || this.input.keyboard?.addKey("D")?.isDown;
+    const left = this.keyLeft.isDown || this.keyA.isDown;
+    const right = this.keyRight.isDown || this.keyD.isDown;
     if (left) this.playerX -= 300 * this.scale_ * delta / 1000;
     if (right) this.playerX += 300 * this.scale_ * delta / 1000;
     this.playerX = Phaser.Math.Clamp(this.playerX, 0, this.playW - this.playerW);

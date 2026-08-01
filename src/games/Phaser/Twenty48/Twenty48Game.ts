@@ -3,8 +3,6 @@ import type { PhaserGameFactory } from "../shared/types";
 import { PALETTE, HEX, FONTS } from "../shared/theme";
 
 const SIZE = 4;
-// Dark late palette tile colors; actual colors computed in darkTileColor().
-const TILE_COLORS: Record<number, number> = {};
 
 class Twenty48Scene extends Phaser.Scene {
   private grid: number[][] = [];
@@ -28,6 +26,10 @@ class Twenty48Scene extends Phaser.Scene {
     this.overlay = this.add.container(0, 0);
     this.input.keyboard?.on("keydown", this.handleKey, this);
     this.scale.on("resize", () => this.draw(), this);
+    this.events.on('shutdown', () => {
+      this.input.keyboard?.off("keydown", this.handleKey, this);
+      this.scale.off("resize", this.draw, this);
+    });
     this.reset();
   }
 
@@ -188,10 +190,10 @@ class Twenty48Scene extends Phaser.Scene {
       }
     }
 
-    if (this.gameOver) {
     // instructions at bottom
     this.add.text(20, h - 26, "Flechas/WASD: mover · R: reiniciar", { fontSize: "13px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
 
+    if (this.gameOver) {
     g.fillStyle(0x000000, 0.5);
     g.fillRoundedRect(this.ox, this.oy, boardSize, boardSize, 12);
     const cx = this.ox + boardSize / 2;

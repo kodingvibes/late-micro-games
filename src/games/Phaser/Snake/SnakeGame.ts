@@ -31,6 +31,10 @@ class SnakeScene extends Phaser.Scene {
     this.overlay = this.add.container(0, 0);
     this.input.keyboard?.on("keydown", this.handleKey, this);
     this.scale.on("resize", () => this.draw(), this);
+    this.events.on('shutdown', () => {
+      this.input.keyboard?.off("keydown", this.handleKey, this);
+      this.scale.off("resize", this.draw, this);
+    });
     this.reset();
   }
 

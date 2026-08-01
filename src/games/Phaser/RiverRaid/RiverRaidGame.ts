@@ -44,6 +44,10 @@ class RiverRaidScene extends Phaser.Scene {
   private nextSpawnY = -200;
   private nextBridgeY = -1200;
   private tick = 0;
+  private keyLeft!: Phaser.Input.Keyboard.Key;
+  private keyRight!: Phaser.Input.Keyboard.Key;
+  private keyA!: Phaser.Input.Keyboard.Key;
+  private keyD!: Phaser.Input.Keyboard.Key;
 
   constructor() { super("RiverRaid"); }
 
@@ -65,8 +69,16 @@ class RiverRaidScene extends Phaser.Scene {
       shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true },
     });
     this.overlay = this.add.container(0, 0);
+    this.keyLeft = this.input.keyboard!.addKey("LEFT");
+    this.keyRight = this.input.keyboard!.addKey("RIGHT");
+    this.keyA = this.input.keyboard!.addKey("A");
+    this.keyD = this.input.keyboard!.addKey("D");
     this.input.keyboard?.on("keydown", this.handleKey, this);
     this.scale.on("resize", () => this.draw(), this);
+    this.events.on('shutdown', () => {
+      this.input.keyboard?.off("keydown", this.handleKey, this);
+      this.scale.off("resize", this.draw, this);
+    });
     this.reset();
   }
 
@@ -202,8 +214,8 @@ class RiverRaidScene extends Phaser.Scene {
     this.riverW += (this.targetRiverW - this.riverW) * dt * 0.5;
 
     // input
-    const left = this.input.keyboard?.addKey("LEFT")?.isDown || this.input.keyboard?.addKey("A")?.isDown;
-    const right = this.input.keyboard?.addKey("RIGHT")?.isDown || this.input.keyboard?.addKey("D")?.isDown;
+    const left = this.keyLeft.isDown || this.keyA.isDown;
+    const right = this.keyRight.isDown || this.keyD.isDown;
     if (left) this.player.x -= 260 * dt;
     if (right) this.player.x += 260 * dt;
 

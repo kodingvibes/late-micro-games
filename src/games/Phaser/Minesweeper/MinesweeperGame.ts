@@ -30,9 +30,14 @@ class MinesweeperScene extends Phaser.Scene {
     this.add.text(20, 12, "MINAS", { fontSize: "11px", color: HEX.textMuted, fontFamily: FONTS.ui.fontFamily });
     this.statusText = this.add.text(20, 24, "15", { fontSize: "24px", color: HEX.cyan, fontFamily: FONTS.dseg.fontFamily, fontStyle: "italic", shadow: { offsetX: 0, offsetY: 0, blur: 12, color: HEX.cyan, fill: true } });
     this.overlay = this.add.container(0, 0);
-    this.input.keyboard?.on("keydown", (e: KeyboardEvent) => { if (e.code === "KeyR") this.scene.restart(); });
+    this.input.keyboard?.on("keydown", this.handleKey, this);
     this.input.on("pointerdown", this.handleClick, this);
     this.scale.on("resize", () => this.draw(), this);
+    this.events.on('shutdown', () => {
+      this.input.keyboard?.off("keydown", this.handleKey, this);
+      this.input.off("pointerdown", this.handleClick, this);
+      this.scale.off("resize", this.draw, this);
+    });
     this.draw();
   }
 
@@ -180,6 +185,10 @@ class MinesweeperScene extends Phaser.Scene {
         }
       }
     }
+  }
+
+  private handleKey(e: KeyboardEvent) {
+    if (e.code === "KeyR") this.scene.restart();
   }
 
   private addMine(cx: number, cy: number, r: number) {
